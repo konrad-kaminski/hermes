@@ -3,7 +3,6 @@ package pl.allegro.tech.hermes.consumers.consumer.batch;
 import pl.allegro.tech.hermes.api.ContentType;
 import pl.allegro.tech.hermes.api.Subscription;
 import pl.allegro.tech.hermes.common.kafka.offset.PartitionOffset;
-import pl.allegro.tech.hermes.consumers.consumer.Message;
 
 import java.nio.ByteBuffer;
 import java.time.Clock;
@@ -50,14 +49,14 @@ public class JsonMessageBatch implements MessageBatch {
     }
 
     @Override
-    public void append(Message message) {
+    public void append(byte[] data, PartitionOffset offset) {
         if (elements == 0) {
             byteBuffer.put("[".getBytes());
         } else {
             byteBuffer.put(",".getBytes());
         }
-        byteBuffer.put(message.getData());
-        partitionOffsets.add(new PartitionOffset(message.getKafkaTopic(), message.getOffset(), message.getPartition()));
+        byteBuffer.put(data);
+        partitionOffsets.add(offset);
         elements++;
     }
 

@@ -1,5 +1,7 @@
 package pl.allegro.tech.hermes.consumers.consumer;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import pl.allegro.tech.hermes.api.Subscription;
@@ -13,7 +15,9 @@ import pl.allegro.tech.hermes.consumers.consumer.sender.MessageSendingResult;
 
 import java.nio.BufferOverflowException;
 import java.time.Clock;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CountDownLatch;
 
@@ -31,6 +35,8 @@ public class BatchConsumer implements Consumer {
 
     private final CountDownLatch stoppedLatch = new CountDownLatch(1);
     boolean consuming = true;
+
+    ObjectMapper mapper = new ObjectMapper();
 
     public BatchConsumer(MessageReceiver receiver,
                          MessageBatchSender sender,
@@ -67,12 +73,24 @@ public class BatchConsumer implements Consumer {
         while (isConsuming() && !batch.isReadyForDelivery()) {
             Message message = inflight.isPresent()? inflight.get() : receiver.next();
             try {
-                batch.append(message);
+                batch.append(getWrappedMessage(message), new PartitionOffset(message.getKafkaTopic(), message.getOffset(), message.getPartition()));
             } catch (BufferOverflowException ex) {
                 return Optional.of(message);
             }
         }
         return Optional.empty();
+    }
+
+    private byte[] getWrappedMessage(Message message) {
+        try {
+            Map<String, Object> map = new HashMap<>();
+            map.put("message_id", message.getId());
+            if(!message.getExternalMetadata().isEmpty()) map.put("metadata", message.getExternalMetadata());
+            map.put("content", new String(message.getData()));
+            return mapper.writeValueAsBytes(map);
+        } catch (JsonProcessingException e) {
+            return message.getData();
+        }
     }
 
     private void deliver(MessageBatch batch, long deliveryStartTime) {
