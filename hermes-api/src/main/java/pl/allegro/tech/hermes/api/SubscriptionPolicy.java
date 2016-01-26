@@ -26,6 +26,7 @@ public class SubscriptionPolicy {
     // TODO: think later whether to introduce SubscriptionBatchPolicy
     private Integer batchSize;
     private Integer batchTime;
+    private Integer batchVolume;
 
     private SubscriptionPolicy() { }
 
@@ -35,7 +36,8 @@ public class SubscriptionPolicy {
                               @JsonProperty("messageBackoff") Integer messageBackoff,
                               @JsonProperty("deliveryType") DeliveryType deliveryType,
                               @JsonProperty("batchSize") Integer batchSize,
-                              @JsonProperty("batchTime") Integer batchTime) {
+                              @JsonProperty("batchTime") Integer batchTime,
+                              @JsonProperty("batchVolume") Integer batchVolume) {
         this.rate = rate;
         this.messageTtl = messageTtl;
         this.retryClientErrors = retryClientErrors;
@@ -43,6 +45,7 @@ public class SubscriptionPolicy {
         this.deliveryType = deliveryType != null ? deliveryType : DeliveryType.SERIAL;
         this.batchSize = batchSize;
         this.batchTime = batchTime;
+        this.batchVolume = batchVolume;
     }
 
     @Override
@@ -110,6 +113,10 @@ public class SubscriptionPolicy {
         return batchTime;
     }
 
+    public Integer getBatchVolume() {
+        return batchVolume;
+    }
+
     public static class Builder {
         private static final Integer DEFAULT_RATE = 400;
         private static final Integer DEFAULT_MESSAGE_TTL = 3600;
@@ -160,6 +167,11 @@ public class SubscriptionPolicy {
 
         public Builder withBatchTime(int time) {
             subscriptionPolicy.batchTime = time;
+            return this;
+        }
+
+        public Builder withBatchVolume(int volume) {
+            subscriptionPolicy.batchVolume = volume;
             return this;
         }
 

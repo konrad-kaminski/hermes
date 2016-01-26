@@ -1,5 +1,6 @@
 package pl.allegro.tech.hermes.consumers.supervisor;
 
+import org.eclipse.jetty.client.HttpClient;
 import pl.allegro.tech.hermes.api.DeliveryType;
 import pl.allegro.tech.hermes.api.Subscription;
 import pl.allegro.tech.hermes.api.Topic;
@@ -9,12 +10,17 @@ import pl.allegro.tech.hermes.consumers.consumer.BatchConsumer;
 import pl.allegro.tech.hermes.consumers.consumer.Consumer;
 import pl.allegro.tech.hermes.consumers.consumer.SerialConsumer;
 import pl.allegro.tech.hermes.consumers.consumer.ConsumerMessageSenderFactory;
+import pl.allegro.tech.hermes.consumers.consumer.batch.ByteBufferMessageBatchFactory;
+import pl.allegro.tech.hermes.consumers.consumer.batch.MessageBatchFactory;
 import pl.allegro.tech.hermes.consumers.consumer.converter.MessageConverterResolver;
 import pl.allegro.tech.hermes.consumers.consumer.offset.SubscriptionOffsetCommitQueues;
 import pl.allegro.tech.hermes.consumers.consumer.rate.ConsumerRateLimitSupervisor;
 import pl.allegro.tech.hermes.consumers.consumer.rate.ConsumerRateLimiter;
 import pl.allegro.tech.hermes.consumers.consumer.rate.calculator.OutputRateCalculator;
+import pl.allegro.tech.hermes.consumers.consumer.receiver.MessageReceiver;
 import pl.allegro.tech.hermes.consumers.consumer.receiver.ReceiverFactory;
+import pl.allegro.tech.hermes.consumers.consumer.sender.MessageBatchSender;
+import pl.allegro.tech.hermes.consumers.consumer.sender.http.JettyMessageBatchSender;
 import pl.allegro.tech.hermes.domain.topic.TopicRepository;
 import pl.allegro.tech.hermes.tracker.consumers.Trackers;
 
@@ -72,11 +78,17 @@ public class ConsumerFactory {
 
         Topic topic = topicRepository.getTopicDetails(subscription.getTopicName());
 
+        MessageReceiver messageReceiver = messageReceiverFactory.createMessageReceiver(topic, subscription);
+
         if (DeliveryType.BATCH == subscription.getSubscriptionPolicy().getDeliveryType()) {
-            return new BatchConsumer(subscription, topic, hermesMetrics);
+            Clock clock = Clock.systemUTC();
+            HttpClient client = new HttpClient();
+            MessageBatchSender sender = new JettyMessageBatchSender(client, 5000);
+            MessageBatchFactory batchFactory = new ByteBufferMessageBatchFactory(0, 1024, 64*1024, clock);
+            return new BatchConsumer(messageReceiver, sender, batchFactory, subscription, clock);
         } else {
             return new SerialConsumer(
-                    messageReceiverFactory.createMessageReceiver(topic, subscription),
+                    messageReceiver,
                     hermesMetrics,
                     subscription,
                     consumerRateLimiter,
@@ -87,8 +99,5 @@ public class ConsumerFactory {
                     messageConverterResolver,
                     topic);
         }
-
-
     }
-
 }

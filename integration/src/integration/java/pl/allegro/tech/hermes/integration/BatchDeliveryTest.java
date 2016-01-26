@@ -43,6 +43,7 @@ public class BatchDeliveryTest extends IntegrationTest {
                 .withDeliveryType(DeliveryType.BATCH)
                 .withBatchSize(2)
                 .withBatchTime(Integer.MAX_VALUE)
+                .withBatchVolume(1024*64)
                 .build();
 
         Subscription subscription = subscription()
@@ -66,7 +67,7 @@ public class BatchDeliveryTest extends IntegrationTest {
         );
 
         // then
-        remoteService.waitUntilReceived(5, 1, message -> {
+        remoteService.waitUntilReceived(60, 1, message -> {
             try {
                 assertThat(mapper.readValue(message, List.class)).hasSize(testMessages.length);
             } catch (IOException e) {
