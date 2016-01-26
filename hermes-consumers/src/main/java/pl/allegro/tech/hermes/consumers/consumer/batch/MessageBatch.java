@@ -1,7 +1,6 @@
 package pl.allegro.tech.hermes.consumers.consumer.batch;
 
 import pl.allegro.tech.hermes.api.ContentType;
-import pl.allegro.tech.hermes.api.Subscription;
 import pl.allegro.tech.hermes.consumers.consumer.Message;
 
 import java.nio.BufferOverflowException;
@@ -19,6 +18,8 @@ public interface MessageBatch {
     ContentType getContentType();
 
     ByteBuffer close();
+
+    ByteBuffer getContent();
 
     boolean isTtlExceeded(long deliveryStartTime);
 }

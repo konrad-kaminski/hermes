@@ -33,4 +33,9 @@ public class ByteBufferMessageBatchFactory implements MessageBatchFactory {
                 throw new UnsupportedOperationException(format("Batching is not supported yet for contentType=%s", subscription.getContentType()));
         }
     }
+
+    @Override
+    public void destroyBatch(MessageBatch batch) {
+        bufferPool.release(batch.getContent());
+    }
 }

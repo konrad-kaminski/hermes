@@ -5,4 +5,6 @@ import pl.allegro.tech.hermes.api.Subscription;
 public interface MessageBatchFactory {
 
     MessageBatch createBatch(Subscription subscription);
+
+    void destroyBatch(MessageBatch batch);
 }

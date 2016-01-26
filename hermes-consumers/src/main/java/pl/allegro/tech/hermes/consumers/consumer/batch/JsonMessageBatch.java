@@ -80,6 +80,11 @@ public class JsonMessageBatch implements MessageBatch {
     }
 
     @Override
+    public ByteBuffer getContent() {
+        return byteBuffer;
+    }
+
+    @Override
     public boolean isTtlExceeded(long deliveryStartTime) {
         return clock.millis() - deliveryStartTime > messageTtl;
     }

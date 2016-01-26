@@ -49,7 +49,9 @@ public class BatchConsumer implements Consumer {
         do {
             MessageBatch batch = batchFactory.createBatch(subscription);
             inflight = fillBatch(batch, inflight);
+            batch.close();
             deliver(batch, clock.millis());
+            batchFactory.destroyBatch(batch);
         } while (isConsuming());
         logger.info("Stopped consumer for subscription {}", subscription.getId());
         unsetThreadName();

@@ -45,7 +45,7 @@ public class JettyMessageBatchSender implements MessageBatchSender {
                     .header(MESSAGE_ID.getName(), batch.getId())
                     .header(HttpHeader.CONTENT_TYPE.toString(), mediaType)
                     .timeout(timeout, TimeUnit.MILLISECONDS)
-                    .content(new ByteBufferContentProvider(mediaType, batch.close()));
+                    .content(new ByteBufferContentProvider(mediaType, batch.getContent()));
             return new MessageSendingResult(request.send().getStatus());
         } catch (InterruptedException | TimeoutException | ExecutionException e) {
             return new MessageSendingResult(e);
