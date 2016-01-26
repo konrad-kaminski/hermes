@@ -72,11 +72,13 @@ public class BatchConsumer implements Consumer {
 
     private Optional<Message> fillBatch(MessageBatch batch, Optional<Message> inflight) {
         while (isConsuming() && !batch.isReadyForDelivery()) {
-            Message message = inflight.isPresent()? inflight.get() : receiver.next();
             try {
-                batch.append(getWrappedMessage(message), new PartitionOffset(message.getKafkaTopic(), message.getOffset(), message.getPartition()));
-            } catch (BufferOverflowException ex) {
-                return Optional.of(message);
+                Message message = inflight.isPresent() ? inflight.get() : receiver.next();
+                try {
+                    batch.append(getWrappedMessage(message), new PartitionOffset(message.getKafkaTopic(), message.getOffset(), message.getPartition()));
+                } catch (BufferOverflowException ex) {
+                    return Optional.of(message);
+                }
             } catch (MessageReceivingTimeoutException ex) {
                 // ignore
             }
