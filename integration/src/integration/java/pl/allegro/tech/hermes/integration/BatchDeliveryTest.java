@@ -33,9 +33,8 @@ public class BatchDeliveryTest extends IntegrationTest {
         this.remoteService = new RemoteServiceEndpoint(SharedServices.services().serviceMock());
     }
 
-    @Ignore
     @SuppressWarnings("unchecked")
-    @Test
+    @Test(enabled = false)
     public void shouldDeliverMessagesInBatch() throws IOException {
         // given
         Topic topic = operations.buildTopic("batchSizeTest", "topic");
