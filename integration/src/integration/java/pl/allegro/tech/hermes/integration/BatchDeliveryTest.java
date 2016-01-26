@@ -1,6 +1,7 @@
 package pl.allegro.tech.hermes.integration;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.Ignore;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 import pl.allegro.tech.hermes.api.ContentType;
@@ -32,6 +33,7 @@ public class BatchDeliveryTest extends IntegrationTest {
         this.remoteService = new RemoteServiceEndpoint(SharedServices.services().serviceMock());
     }
 
+    @Ignore
     @SuppressWarnings("unchecked")
     @Test
     public void shouldDeliverMessagesInBatch() throws IOException {
