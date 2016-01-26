@@ -10,6 +10,7 @@ import pl.allegro.tech.hermes.consumers.consumer.batch.MessageBatchFactory;
 import pl.allegro.tech.hermes.consumers.consumer.offset.SubscriptionOffsetCommitQueues;
 import pl.allegro.tech.hermes.consumers.consumer.receiver.MessageReceiver;
 import pl.allegro.tech.hermes.consumers.consumer.batch.MessageBatch;
+import pl.allegro.tech.hermes.consumers.consumer.receiver.MessageReceivingTimeoutException;
 import pl.allegro.tech.hermes.consumers.consumer.sender.MessageBatchSender;
 import pl.allegro.tech.hermes.consumers.consumer.sender.MessageSendingResult;
 
@@ -76,6 +77,8 @@ public class BatchConsumer implements Consumer {
                 batch.append(getWrappedMessage(message), new PartitionOffset(message.getKafkaTopic(), message.getOffset(), message.getPartition()));
             } catch (BufferOverflowException ex) {
                 return Optional.of(message);
+            } catch (MessageReceivingTimeoutException ex) {
+                // ignore
             }
         }
         return Optional.empty();
