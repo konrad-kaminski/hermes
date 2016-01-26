@@ -2,10 +2,13 @@ package pl.allegro.tech.hermes.consumers.consumer.batch;
 
 import pl.allegro.tech.hermes.api.ContentType;
 import pl.allegro.tech.hermes.api.Subscription;
+import pl.allegro.tech.hermes.common.kafka.offset.PartitionOffset;
 import pl.allegro.tech.hermes.consumers.consumer.Message;
 
 import java.nio.ByteBuffer;
 import java.time.Clock;
+import java.util.ArrayList;
+import java.util.List;
 
 public class JsonMessageBatch implements MessageBatch {
     private final Clock clock;
@@ -18,6 +21,8 @@ public class JsonMessageBatch implements MessageBatch {
     private final String id;
 
     private final ByteBuffer byteBuffer;
+
+    private List<PartitionOffset> partitionOffsets = new ArrayList<>();
 
     private int elements = 0;
 
@@ -52,6 +57,7 @@ public class JsonMessageBatch implements MessageBatch {
             byteBuffer.put(",".getBytes());
         }
         byteBuffer.put(message.getData());
+        partitionOffsets.add(new PartitionOffset(message.getKafkaTopic(), message.getOffset(), message.getPartition()));
         elements++;
     }
 
@@ -87,5 +93,10 @@ public class JsonMessageBatch implements MessageBatch {
     @Override
     public boolean isTtlExceeded(long deliveryStartTime) {
         return clock.millis() - deliveryStartTime > messageTtl;
+    }
+
+    @Override
+    public List<PartitionOffset> getPartitionOffsets() {
+        return partitionOffsets;
     }
 }

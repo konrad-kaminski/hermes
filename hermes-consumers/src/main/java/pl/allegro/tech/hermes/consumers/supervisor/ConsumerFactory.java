@@ -85,7 +85,7 @@ public class ConsumerFactory {
             HttpClient client = new HttpClient();
             MessageBatchSender sender = new JettyMessageBatchSender(client, 5000);
             MessageBatchFactory batchFactory = new ByteBufferMessageBatchFactory(0, 1024, 64*1024, clock);
-            return new BatchConsumer(messageReceiver, sender, batchFactory, subscription, clock);
+            return new BatchConsumer(messageReceiver, sender, batchFactory, subscriptionOffsetCommitQueues, subscription, clock);
         } else {
             return new SerialConsumer(
                     messageReceiver,

@@ -5,6 +5,7 @@ import org.slf4j.LoggerFactory;
 import pl.allegro.tech.hermes.api.Subscription;
 import pl.allegro.tech.hermes.common.kafka.offset.PartitionOffset;
 import pl.allegro.tech.hermes.consumers.consumer.batch.MessageBatchFactory;
+import pl.allegro.tech.hermes.consumers.consumer.offset.SubscriptionOffsetCommitQueues;
 import pl.allegro.tech.hermes.consumers.consumer.receiver.MessageReceiver;
 import pl.allegro.tech.hermes.consumers.consumer.batch.MessageBatch;
 import pl.allegro.tech.hermes.consumers.consumer.sender.MessageBatchSender;
@@ -25,6 +26,7 @@ public class BatchConsumer implements Consumer {
 
     private final Clock clock;
 
+    private final SubscriptionOffsetCommitQueues offsets;
     private Subscription subscription;
 
     private final CountDownLatch stoppedLatch = new CountDownLatch(1);
@@ -33,11 +35,13 @@ public class BatchConsumer implements Consumer {
     public BatchConsumer(MessageReceiver receiver,
                          MessageBatchSender sender,
                          MessageBatchFactory batchFactory,
+                         SubscriptionOffsetCommitQueues offsets,
                          Subscription subscription,
                          Clock clock) {
         this.receiver = receiver;
         this.sender = sender;
         this.batchFactory = batchFactory;
+        this.offsets = offsets;
         this.subscription = subscription;
         this.clock = clock;
     }
@@ -51,6 +55,7 @@ public class BatchConsumer implements Consumer {
             inflight = fillBatch(batch, inflight);
             batch.close();
             deliver(batch, clock.millis());
+            offsets.putAll(batch.getPartitionOffsets());
             batchFactory.destroyBatch(batch);
         } while (isConsuming());
         logger.info("Stopped consumer for subscription {}", subscription.getId());
@@ -107,7 +112,7 @@ public class BatchConsumer implements Consumer {
 
     @Override
     public List<PartitionOffset> getOffsetsToCommit() {
-        return null;
+        return offsets.getOffsetsToCommit();
     }
 
     @Override

@@ -18,7 +18,7 @@ import java.util.concurrent.TimeoutException;
 
 import static javax.ws.rs.core.MediaType.APPLICATION_JSON;
 import static pl.allegro.tech.hermes.api.ContentType.AVRO;
-import static pl.allegro.tech.hermes.common.http.MessageMetadataHeaders.MESSAGE_ID;
+import static pl.allegro.tech.hermes.common.http.MessageMetadataHeaders.BATCH_ID;
 import static pl.allegro.tech.hermes.consumers.consumer.sender.http.AvroMediaType.AVRO_BINARY;
 
 public class JettyMessageBatchSender implements MessageBatchSender {
@@ -42,7 +42,7 @@ public class JettyMessageBatchSender implements MessageBatchSender {
             Request request = client.newRequest(address.getEndpoint())
                     .method(HttpMethod.POST)
                     .header(HttpHeader.KEEP_ALIVE.toString(), "true")
-                    .header(MESSAGE_ID.getName(), batch.getId())
+                    .header(BATCH_ID.getName(), batch.getId())
                     .header(HttpHeader.CONTENT_TYPE.toString(), mediaType)
                     .timeout(timeout, TimeUnit.MILLISECONDS)
                     .content(new ByteBufferContentProvider(mediaType, batch.getContent()));
