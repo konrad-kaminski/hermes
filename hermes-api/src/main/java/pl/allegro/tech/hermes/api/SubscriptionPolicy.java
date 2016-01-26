@@ -65,7 +65,11 @@ public class SubscriptionPolicy {
         return Objects.equals(this.rate, other.rate)
                 && Objects.equals(this.messageTtl, other.messageTtl)
                 && Objects.equals(this.messageBackoff, other.messageBackoff)
-                && Objects.equals(this.retryClientErrors, other.retryClientErrors);
+                && Objects.equals(this.retryClientErrors, other.retryClientErrors)
+                && Objects.equals(this.deliveryType, other.deliveryType)
+                && Objects.equals(this.batchSize, other.batchSize)
+                && Objects.equals(this.batchTime, other.batchTime)
+                && Objects.equals(this.batchVolume, other.batchVolume);
     }
 
     @Override
@@ -75,6 +79,10 @@ public class SubscriptionPolicy {
                 .add("messageTtl", messageTtl)
                 .add("messageBackoff", messageBackoff)
                 .add("retryClientErrors", retryClientErrors)
+                .add("deliveryType", deliveryType)
+                .add("batchSize", batchSize)
+                .add("batchTime", batchTime)
+                .add("batchVolume", batchVolume)
                 .toString();
     }
 
