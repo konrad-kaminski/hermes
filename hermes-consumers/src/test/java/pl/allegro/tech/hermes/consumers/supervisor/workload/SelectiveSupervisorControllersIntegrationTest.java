@@ -2,6 +2,7 @@ package pl.allegro.tech.hermes.consumers.supervisor.workload;
 
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 import pl.allegro.tech.hermes.api.SubscriptionName;
 import pl.allegro.tech.hermes.consumers.supervisor.workload.selective.SelectiveSupervisorController;
@@ -14,6 +15,7 @@ import static com.jayway.awaitility.Duration.FIVE_SECONDS;
 import static org.assertj.core.api.Assertions.assertThat;
 import static pl.allegro.tech.hermes.test.helper.endpoint.TimeoutAdjuster.adjust;
 
+@Ignore
 public class SelectiveSupervisorControllersIntegrationTest extends ZookeeperBaseTest {
     private ConsumerTestRuntimeEnvironment runtime;
 

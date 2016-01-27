@@ -34,7 +34,7 @@ public class BatchDeliveryTest extends IntegrationTest {
     }
 
     @SuppressWarnings("unchecked")
-    @Test(enabled = false)
+    @Test
     public void shouldDeliverMessagesInBatch() throws IOException {
         // given
         Topic topic = operations.buildTopic("batchSizeTest", "topic");
