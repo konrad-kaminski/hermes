@@ -39,6 +39,14 @@ public final class TestMessage {
         return new TestMessage().append("random", UUID.randomUUID().toString());
     }
 
+    public static TestMessage wrappedSingleBatchMessage(String key, Object value) {
+        TestMessage message = new TestMessage();
+        message.content.put("message_id", UUID.randomUUID().toString());
+        message.content.put("content", of(key, value));
+        return message;
+    }
+
+
     public TestMessage append(String key, Object value) {
         content.put(key, value);
         return this;
@@ -50,6 +58,10 @@ public final class TestMessage {
 
     public String body() {
         return toString();
+    }
+
+    public Map<String, Object> getContent() {
+        return content;
     }
 
     @Override

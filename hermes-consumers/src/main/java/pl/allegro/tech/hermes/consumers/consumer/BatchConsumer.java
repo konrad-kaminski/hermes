@@ -14,6 +14,7 @@ import pl.allegro.tech.hermes.consumers.consumer.receiver.MessageReceivingTimeou
 import pl.allegro.tech.hermes.consumers.consumer.sender.MessageBatchSender;
 import pl.allegro.tech.hermes.consumers.consumer.sender.MessageSendingResult;
 
+import java.io.IOException;
 import java.nio.BufferOverflowException;
 import java.time.Clock;
 import java.util.HashMap;
@@ -70,11 +71,14 @@ public class BatchConsumer implements Consumer {
         stoppedLatch.countDown();
     }
 
-    private Optional<Message> fillBatch(MessageBatch batch, Optional<Message> inflight) {
+    private Optional<Message> fillBatch(MessageBatch batch, Optional<Message> i) {
+        Optional<Message> inflight = i;
         while (isConsuming() && !batch.isReadyForDelivery()) {
             try {
-                Message message = inflight.isPresent() ? inflight.get() : receiver.next();
+                Message message = inflight.isPresent()? inflight.get() : receiver.next();
+                inflight = Optional.empty();
                 try {
+                    System.out.println(new String(getWrappedMessage(message)));
                     batch.append(getWrappedMessage(message), new PartitionOffset(message.getKafkaTopic(), message.getOffset(), message.getPartition()));
                 } catch (BufferOverflowException ex) {
                     return Optional.of(message);
@@ -91,9 +95,9 @@ public class BatchConsumer implements Consumer {
             Map<String, Object> map = new HashMap<>();
             map.put("message_id", message.getId());
             if(!message.getExternalMetadata().isEmpty()) map.put("metadata", message.getExternalMetadata());
-            map.put("content", new String(message.getData()));
+            map.put("content", mapper.readValue(message.getData(), Map.class));
             return mapper.writeValueAsBytes(map);
-        } catch (JsonProcessingException e) {
+        } catch (IOException e) {
             return message.getData();
         }
     }

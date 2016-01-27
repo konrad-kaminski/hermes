@@ -1,14 +1,9 @@
 package pl.allegro.tech.hermes.integration;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.junit.Ignore;
+import com.jayway.awaitility.Duration;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
-import pl.allegro.tech.hermes.api.ContentType;
-import pl.allegro.tech.hermes.api.DeliveryType;
-import pl.allegro.tech.hermes.api.EndpointAddress;
-import pl.allegro.tech.hermes.api.Subscription;
-import pl.allegro.tech.hermes.api.SubscriptionPolicy;
 import pl.allegro.tech.hermes.api.Topic;
 import pl.allegro.tech.hermes.integration.env.SharedServices;
 import pl.allegro.tech.hermes.test.helper.endpoint.RemoteServiceEndpoint;
@@ -17,10 +12,10 @@ import pl.allegro.tech.hermes.test.helper.message.TestMessage;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 import static javax.ws.rs.core.Response.Status.CREATED;
-import static pl.allegro.tech.hermes.api.Subscription.Builder.subscription;
-import static pl.allegro.tech.hermes.api.SubscriptionPolicy.Builder.subscriptionPolicy;
 import static pl.allegro.tech.hermes.integration.test.HermesAssertions.assertThat;
 
 public class BatchDeliveryTest extends IntegrationTest {
@@ -39,44 +34,86 @@ public class BatchDeliveryTest extends IntegrationTest {
         // given
         Topic topic = operations.buildTopic("batchSizeTest", "topic");
 
-        SubscriptionPolicy policy = subscriptionPolicy()
-                .applyDefaults()
-                .withDeliveryType(DeliveryType.BATCH)
-                .withBatchSize(2)
-                .withBatchTime(Integer.MAX_VALUE)
-                .withBatchVolume(1024*64)
-                .build();
+        int batchSize = 2;
+        operations.createBatchSubscription(topic, "deliverMessagesInBatch", HTTP_ENDPOINT_URL, batchSize, Integer.MAX_VALUE, 1024);
 
-        Subscription subscription = subscription()
-                .applyDefaults()
-                .withContentType(ContentType.JSON)
-                .withSupportTeam("foo")
-                .withSubscriptionPolicy(policy)
-                .withName("batchSizeTest")
-                .withTopicName(topic.getQualifiedName())
-                .withEndpoint(new EndpointAddress(HTTP_ENDPOINT_URL))
-                .build();
-
-        operations.createSubscription(topic, subscription);
-
-        TestMessage[] testMessages = TestMessage.simpleMessages(policy.getBatchSize());
+        TestMessage[] testMessages = TestMessage.simpleMessages(batchSize);
 
         // when
         remoteService.expectMessages(testMessages);
-        Arrays.stream(testMessages).forEach( m ->
-            assertThat(publisher.publish(topic.getQualifiedName(), m.body())).hasStatus(CREATED)
+        Arrays.stream(testMessages).forEach(m ->
+                assertThat(publisher.publish(topic.getQualifiedName(), m.body())).hasStatus(CREATED)
         );
 
         // then
         remoteService.waitUntilReceived(60, 1, message -> {
-            try {
-                assertThat(mapper.readValue(message, List.class)).hasSize(testMessages.length);
-            } catch (IOException e) {
-                throw new RuntimeException(e);
+            List<Map<String, Object>> batch = readBatch(message);
+            assertThat(batch).hasSize(batchSize);
+
+            for (int i = 0; i < batchSize; i++) {
+                assertThat(batch.get(i).get("content")).isEqualTo(testMessages[i].getContent());
+                assertThat((String) batch.get(i).get("message_id")).isNotEmpty();
             }
         });
     }
 
+    @SuppressWarnings("unchecked")
+    @Test
+    public void shouldDeliverBatchInGivenTimePeriod() throws IOException {
+        // given
+        Topic topic = operations.buildTopic("batchSizeTest", "topic");
+
+        int batchTime = 500;
+        operations.createBatchSubscription(topic, "deliverBatchInGivenTimePeriod", HTTP_ENDPOINT_URL, 10, batchTime, 1024);
+
+        TestMessage message = TestMessage.simple();
+
+        // when
+        remoteService.expectMessages(message);
+        assertThat(publisher.publish(topic.getQualifiedName(), message.body())).hasStatus(CREATED);
+
+        // then
+        remoteService.waitUntilReceived(5, 1, m -> {
+            List<Map<String, Object>> batch = readBatch(m);
+            assertThat(batch).hasSize(1);
+            assertThat(batch.get(0).get("content")).isEqualTo(message.getContent());
+        });
+    }
+
+    @SuppressWarnings("unchecked")
+    @Test
+    public void shouldDeliverBatchInVolume() throws IOException, InterruptedException {
+        // given
+        Topic topic = operations.buildTopic("deliverBatchInGivenVolume", "topic");
+
+        TestMessage message = TestMessage.wrappedSingleBatchMessage("message1", "message1");
+
+        operations.createBatchSubscription(topic, "deliverBatchInGivenVolume", HTTP_ENDPOINT_URL, 100, Integer.MAX_VALUE, message.toString().getBytes().length + 5);
+
+        TestMessage message1 = TestMessage.of("message1", "message1");
+        TestMessage message2 = TestMessage.of("message2", "message2");
+
+        // when
+        remoteService.expectMessages(message2);
+        assertThat(publisher.publish(topic.getQualifiedName(), message1.body())).hasStatus(CREATED);
+        Thread.sleep(1000);
+        assertThat(publisher.publish(topic.getQualifiedName(), message2.body())).hasStatus(CREATED);
+
+        // then
+        remoteService.waitUntilReceived(100, 1, m -> {
+            List<Map<String, Object>> batch = readBatch(m);
+            assertThat(batch).hasSize(1);
+            assertThat(batch.get(0).get("content")).isEqualTo(message1.getContent());
+        });
+    }
+
+    private List<Map<String, Object>> readBatch(String message) {
+        try {
+            return mapper.readValue(message, List.class);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
 
 
 }
