@@ -76,7 +76,7 @@ class JsonMessageBatchTest extends Specification {
     }
 
     @Unroll
-    def "aaa"() {
+    def "should count batchTime since first message appended"() {
         given:
         Integer currentTime = 1;
         Clock clock = Stub() { millis() >> { currentTime } }
