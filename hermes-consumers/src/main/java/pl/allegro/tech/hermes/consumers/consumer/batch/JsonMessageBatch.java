@@ -16,7 +16,6 @@ public class JsonMessageBatch implements MessageBatch {
     private final Clock clock;
 
     private final int maxBatchTime;
-    private final int messageTtl;
     private final int batchSize;
 
     private final String id;
@@ -27,11 +26,10 @@ public class JsonMessageBatch implements MessageBatch {
     private long batchStart;
     private boolean closed = false;
 
-    public JsonMessageBatch(String id, ByteBuffer buffer, int size, int batchTime, int batchTtl, Clock clock) {
+    public JsonMessageBatch(String id, ByteBuffer buffer, int size, int batchTime, Clock clock) {
         this.id = id;
         this.clock = clock;
         this.maxBatchTime = batchTime;
-        this.messageTtl = batchTtl;
         this.batchSize = size;
         this.byteBuffer = buffer;
     }
@@ -40,7 +38,6 @@ public class JsonMessageBatch implements MessageBatch {
         this(id, buffer,
                 subscription.getSubscriptionPolicy().getBatchSize(),
                 subscription.getSubscriptionPolicy().getBatchTime(),
-                subscription.getSubscriptionPolicy().getMessageTtl(),
                 clock);
     }
 
@@ -93,11 +90,6 @@ public class JsonMessageBatch implements MessageBatch {
     @Override
     public ByteBuffer getContent() {
         return byteBuffer;
-    }
-
-    @Override
-    public boolean isTtlExceeded(long deliveryStartTime) {
-        return clock.millis() - deliveryStartTime > messageTtl;
     }
 
     @Override

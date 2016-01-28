@@ -24,7 +24,5 @@ public interface MessageBatch {
 
     ByteBuffer getContent();
 
-    boolean isTtlExceeded(long deliveryStartTime);
-
     List<PartitionOffset> getPartitionOffsets();
 }

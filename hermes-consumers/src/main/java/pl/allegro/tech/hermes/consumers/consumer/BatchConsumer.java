@@ -65,7 +65,11 @@ public class BatchConsumer implements Consumer {
         do {
             MessageSendingResult result = sender.send(batch, subscription.getEndpoint());
             isRetryRequired = isRetryRequired(result);
-        } while (isRetryRequired && !batch.isTtlExceeded(deliveryStartTime));
+        } while (isRetryRequired && !isTtlExceeded(deliveryStartTime));
+    }
+
+    private boolean isTtlExceeded(long deliveryStartTime) {
+        return clock.millis() - deliveryStartTime > subscription.getSubscriptionPolicy().getMessageTtl();
     }
 
     private boolean isRetryRequired(MessageSendingResult result) {
