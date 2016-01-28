@@ -1,23 +1,19 @@
 package pl.allegro.tech.hermes.consumers.consumer;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import pl.allegro.tech.hermes.api.Subscription;
 import pl.allegro.tech.hermes.common.kafka.offset.PartitionOffset;
+import pl.allegro.tech.hermes.consumers.consumer.batch.MessageBatch;
 import pl.allegro.tech.hermes.consumers.consumer.batch.MessageBatchFactory;
 import pl.allegro.tech.hermes.consumers.consumer.offset.SubscriptionOffsetCommitQueues;
 import pl.allegro.tech.hermes.consumers.consumer.receiver.MessageReceiver;
-import pl.allegro.tech.hermes.consumers.consumer.batch.MessageBatch;
 import pl.allegro.tech.hermes.consumers.consumer.receiver.MessageReceivingTimeoutException;
 import pl.allegro.tech.hermes.consumers.consumer.sender.MessageBatchSender;
 import pl.allegro.tech.hermes.consumers.consumer.sender.MessageSendingResult;
 
-import java.io.IOException;
 import java.time.Clock;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CountDownLatch;
 
@@ -30,23 +26,24 @@ public class BatchConsumer implements Consumer {
 
     private final Clock clock;
 
+    private final MessageBatchWrapper messageBatchWrapper;
     private final SubscriptionOffsetCommitQueues offsets;
     private Subscription subscription;
 
     private final CountDownLatch stoppedLatch = new CountDownLatch(1);
     boolean consuming = true;
 
-    ObjectMapper mapper = new ObjectMapper();
-
     public BatchConsumer(MessageReceiver receiver,
                          MessageBatchSender sender,
                          MessageBatchFactory batchFactory,
+                         MessageBatchWrapper messageBatchWrapper,
                          SubscriptionOffsetCommitQueues offsets,
                          Subscription subscription,
                          Clock clock) {
         this.receiver = receiver;
         this.sender = sender;
         this.batchFactory = batchFactory;
+        this.messageBatchWrapper = messageBatchWrapper;
         this.offsets = offsets;
         this.subscription = subscription;
         this.clock = clock;
@@ -73,9 +70,9 @@ public class BatchConsumer implements Consumer {
         Optional<Message> inflight = i;
         while (isConsuming() && !batch.isReadyForDelivery()) {
             try {
-                Message message = inflight.isPresent()? inflight.get() : receiver.next();
+                Message message = inflight.isPresent() ? inflight.get() : receiver.next();
                 inflight = Optional.empty();
-                byte[] data = getWrappedMessage(message);
+                byte[] data = messageBatchWrapper.wrap(message);
                 if (batch.canFit(data)) {
                     batch.append(data, new PartitionOffset(message.getKafkaTopic(), message.getOffset(), message.getPartition()));
                 } else {
@@ -86,18 +83,6 @@ public class BatchConsumer implements Consumer {
             }
         }
         return Optional.empty();
-    }
-
-    private byte[] getWrappedMessage(Message message) {
-        try {
-            Map<String, Object> map = new HashMap<>();
-            map.put("message_id", message.getId());
-            if(!message.getExternalMetadata().isEmpty()) map.put("metadata", message.getExternalMetadata());
-            map.put("content", mapper.readValue(message.getData(), Map.class));
-            return mapper.writeValueAsBytes(map);
-        } catch (IOException e) {
-            return message.getData();
-        }
     }
 
     private void deliver(MessageBatch batch, long deliveryStartTime) {

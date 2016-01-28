@@ -26,12 +26,12 @@ public class JsonMessageBatch implements MessageBatch {
 
     private int elements = 0;
 
-    public JsonMessageBatch(String id, ByteBuffer buffer, int size, int maxBatchTime, int messageTtl, Clock clock) {
+    public JsonMessageBatch(String id, ByteBuffer buffer, int size, int batchTime, int batchTtl, Clock clock) {
         this.id = id;
         this.clock = clock;
         this.creationTime = clock.millis();
-        this.maxBatchTime = maxBatchTime;
-        this.messageTtl = messageTtl;
+        this.maxBatchTime = batchTime;
+        this.messageTtl = batchTtl;
         this.batchSize = size;
         this.byteBuffer = buffer;
     }
@@ -46,7 +46,7 @@ public class JsonMessageBatch implements MessageBatch {
 
     @Override
     public boolean isFull() {
-        return elements >= batchSize;
+        return elements >= batchSize || byteBuffer.remaining() < 2;
     }
 
     @Override

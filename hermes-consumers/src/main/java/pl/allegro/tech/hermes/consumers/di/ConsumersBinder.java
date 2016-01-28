@@ -9,6 +9,7 @@ import pl.allegro.tech.hermes.common.di.factories.UndeliveredMessageLogFactory;
 import pl.allegro.tech.hermes.common.message.undelivered.UndeliveredMessageLog;
 import pl.allegro.tech.hermes.common.metric.executor.InstrumentedExecutorServiceFactory;
 import pl.allegro.tech.hermes.consumers.consumer.ConsumerMessageSenderFactory;
+import pl.allegro.tech.hermes.consumers.consumer.MessageBatchWrapper;
 import pl.allegro.tech.hermes.consumers.consumer.converter.AvroToJsonMessageConverter;
 import pl.allegro.tech.hermes.consumers.consumer.converter.MessageConverterResolver;
 import pl.allegro.tech.hermes.consumers.consumer.converter.NoOperationMessageConverter;
@@ -104,6 +105,7 @@ public class ConsumersBinder extends AbstractBinder {
         bindFactory(SupervisorControllerFactory.class).in(Singleton.class).to(SupervisorController.class);
 
         bindSingleton(UndeliveredMessageLogPersister.class);
+        bindSingleton(MessageBatchWrapper.class);
     }
 
     private <T> void bindSingleton(Class<T> clazz) {

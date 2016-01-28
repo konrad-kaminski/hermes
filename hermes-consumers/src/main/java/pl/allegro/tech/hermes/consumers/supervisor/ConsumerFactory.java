@@ -8,6 +8,7 @@ import pl.allegro.tech.hermes.common.config.ConfigFactory;
 import pl.allegro.tech.hermes.common.metric.HermesMetrics;
 import pl.allegro.tech.hermes.consumers.consumer.BatchConsumer;
 import pl.allegro.tech.hermes.consumers.consumer.Consumer;
+import pl.allegro.tech.hermes.consumers.consumer.MessageBatchWrapper;
 import pl.allegro.tech.hermes.consumers.consumer.SerialConsumer;
 import pl.allegro.tech.hermes.consumers.consumer.ConsumerMessageSenderFactory;
 import pl.allegro.tech.hermes.consumers.consumer.batch.ByteBufferMessageBatchFactory;
@@ -42,18 +43,20 @@ public class ConsumerFactory {
     private final Clock clock;
     private final TopicRepository topicRepository;
     private final MessageConverterResolver messageConverterResolver;
+    private final MessageBatchWrapper messageBatchWrapper;
 
     @Inject
     public ConsumerFactory(ReceiverFactory messageReceiverFactory,
-            HermesMetrics hermesMetrics,
-            ConfigFactory configFactory,
-            ConsumerRateLimitSupervisor consumerRateLimitSupervisor,
-            OutputRateCalculator outputRateCalculator,
-            Trackers trackers,
-            ConsumerMessageSenderFactory consumerMessageSenderFactory,
-            Clock clock,
-            TopicRepository topicRepository,
-            MessageConverterResolver messageConverterResolver) {
+                           HermesMetrics hermesMetrics,
+                           ConfigFactory configFactory,
+                           ConsumerRateLimitSupervisor consumerRateLimitSupervisor,
+                           OutputRateCalculator outputRateCalculator,
+                           Trackers trackers,
+                           ConsumerMessageSenderFactory consumerMessageSenderFactory,
+                           Clock clock,
+                           TopicRepository topicRepository,
+                           MessageConverterResolver messageConverterResolver,
+                           MessageBatchWrapper messageBatchWrapper) {
 
         this.messageReceiverFactory = messageReceiverFactory;
         this.hermesMetrics = hermesMetrics;
@@ -65,6 +68,7 @@ public class ConsumerFactory {
         this.clock = clock;
         this.topicRepository = topicRepository;
         this.messageConverterResolver = messageConverterResolver;
+        this.messageBatchWrapper = messageBatchWrapper;
     }
 
     Consumer createConsumer(Subscription subscription) {
@@ -85,7 +89,7 @@ public class ConsumerFactory {
             HttpClient client = new HttpClient();
             MessageBatchSender sender = new JettyMessageBatchSender(client, 5000);
             MessageBatchFactory batchFactory = new ByteBufferMessageBatchFactory(0, 1024, 64*1024, clock);
-            return new BatchConsumer(messageReceiver, sender, batchFactory, subscriptionOffsetCommitQueues, subscription, clock);
+            return new BatchConsumer(messageReceiver, sender, batchFactory, messageBatchWrapper, subscriptionOffsetCommitQueues, subscription, clock);
         } else {
             return new SerialConsumer(
                     messageReceiver,
