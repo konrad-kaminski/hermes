@@ -20,7 +20,7 @@ public interface MessageBatch {
 
     ContentType getContentType();
 
-    ByteBuffer close();
+    MessageBatch close();
 
     ByteBuffer getContent();
 

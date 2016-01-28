@@ -10,26 +10,26 @@ import java.time.Clock;
 import java.util.ArrayList;
 import java.util.List;
 
+import static com.google.common.base.Preconditions.checkState;
+
 public class JsonMessageBatch implements MessageBatch {
     private final Clock clock;
 
-    private final long creationTime;
     private final int maxBatchTime;
     private final int messageTtl;
     private final int batchSize;
 
     private final String id;
-
     private final ByteBuffer byteBuffer;
-
-    private List<PartitionOffset> partitionOffsets = new ArrayList<>();
+    private final List<PartitionOffset> partitionOffsets = new ArrayList<>();
 
     private int elements = 0;
+    private long batchStart;
+    private boolean closed = false;
 
     public JsonMessageBatch(String id, ByteBuffer buffer, int size, int batchTime, int batchTtl, Clock clock) {
         this.id = id;
         this.clock = clock;
-        this.creationTime = clock.millis();
         this.maxBatchTime = batchTime;
         this.messageTtl = batchTtl;
         this.batchSize = size;
@@ -51,16 +51,11 @@ public class JsonMessageBatch implements MessageBatch {
 
     @Override
     public void append(byte[] data, PartitionOffset offset) {
-        if (!canFit(data)) {
-            throw new BufferOverflowException();
-        }
+        checkState(!closed, "Batch already closed.");
+        if (!canFit(data)) throw new BufferOverflowException();
+        if (elements == 0) batchStart = clock.millis();
 
-        if (elements == 0) {
-            byteBuffer.put("[".getBytes());
-        } else {
-            byteBuffer.put(",".getBytes());
-        }
-        byteBuffer.put(data);
+        byteBuffer.put((byte)(elements == 0? '[' : ',')).put(data);
         partitionOffsets.add(offset);
         elements++;
     }
@@ -72,7 +67,7 @@ public class JsonMessageBatch implements MessageBatch {
 
     @Override
     public boolean isReadyForDelivery() {
-        return isFull() || (clock.millis() - creationTime > maxBatchTime && elements > 0);
+        return closed || isFull() || (clock.millis() - batchStart > maxBatchTime);
     }
 
     @Override
@@ -86,12 +81,13 @@ public class JsonMessageBatch implements MessageBatch {
     }
 
     @Override
-    public ByteBuffer close() {
+    public MessageBatch close() {
         byteBuffer.put("]".getBytes());
         int position = byteBuffer.position();
         byteBuffer.position(0);
         byteBuffer.limit(position);
-        return byteBuffer;
+        this.closed = true;
+        return this;
     }
 
     @Override

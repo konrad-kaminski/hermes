@@ -9,6 +9,7 @@ import java.nio.ByteBuffer
 import java.time.Clock
 
 import static java.nio.ByteBuffer.allocateDirect
+import static java.time.Clock.systemDefaultZone
 
 class JsonMessageBatchTest extends Specification {
 
@@ -19,12 +20,10 @@ class JsonMessageBatchTest extends Specification {
 
     static def BATCH_ID = "1"
 
-    Clock clock = Clock.systemUTC();
-
     @Unroll
     def "should append data into buffer"() {
         given:
-        JsonMessageBatch batch = new JsonMessageBatch(BATCH_ID, ByteBuffer.allocate(capacity), LARGE_BATCH_SIZE, LARGE_BATCH_TIME, LARGE_MESSAGE_TTL, clock)
+        JsonMessageBatch batch = new JsonMessageBatch(BATCH_ID, ByteBuffer.allocate(capacity), LARGE_BATCH_SIZE, LARGE_BATCH_TIME, LARGE_MESSAGE_TTL, systemDefaultZone())
 
         when:
         data.each { it -> batch.append(it.bytes, Stub(PartitionOffset)) }
@@ -73,6 +72,24 @@ class JsonMessageBatchTest extends Specification {
         jsonMessageBatch.append(data, Stub(PartitionOffset))
 
         then:
-        jsonMessageBatch.isReadyForDelivery() == true
+        jsonMessageBatch.isReadyForDelivery()
+    }
+
+    @Unroll
+    def "aaa"() {
+        given:
+        Integer currentTime = 1;
+        Clock clock = Stub() { millis() >> { currentTime } }
+
+        def batchTtl = 10
+        JsonMessageBatch jsonMessageBatch = new JsonMessageBatch(BATCH_ID, allocateDirect(LARGE_BATCH_VOLUME), LARGE_BATCH_SIZE, batchTtl, LARGE_MESSAGE_TTL, clock)
+        currentTime = batchTtl + 1
+
+        when:
+        jsonMessageBatch.append("xxx".bytes, Stub(PartitionOffset))
+        currentTime = batchTtl + 5
+
+        then:
+        !jsonMessageBatch.isReadyForDelivery()
     }
 }
