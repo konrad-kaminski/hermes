@@ -76,7 +76,7 @@ public class BatchDeliveryTest extends IntegrationTest {
         publish(topic, SINGLE_MESSAGE);
         publish(topic, SINGLE_MESSAGE);
 
-        // then we expect to receive batch that has desired batch volume
+        // then we expect to receive batch that has desired batch volume (one message only)
         expectSingleBatch(SINGLE_MESSAGE);
     }
 

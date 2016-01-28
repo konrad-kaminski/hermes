@@ -1,6 +1,5 @@
 package pl.allegro.tech.hermes.consumers.consumer;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -15,7 +14,6 @@ import pl.allegro.tech.hermes.consumers.consumer.sender.MessageBatchSender;
 import pl.allegro.tech.hermes.consumers.consumer.sender.MessageSendingResult;
 
 import java.io.IOException;
-import java.nio.BufferOverflowException;
 import java.time.Clock;
 import java.util.HashMap;
 import java.util.List;
@@ -77,10 +75,10 @@ public class BatchConsumer implements Consumer {
             try {
                 Message message = inflight.isPresent()? inflight.get() : receiver.next();
                 inflight = Optional.empty();
-                try {
-                    System.out.println(new String(getWrappedMessage(message)));
-                    batch.append(getWrappedMessage(message), new PartitionOffset(message.getKafkaTopic(), message.getOffset(), message.getPartition()));
-                } catch (BufferOverflowException ex) {
+                byte[] data = getWrappedMessage(message);
+                if (batch.canFit(data)) {
+                    batch.append(data, new PartitionOffset(message.getKafkaTopic(), message.getOffset(), message.getPartition()));
+                } else {
                     return Optional.of(message);
                 }
             } catch (MessageReceivingTimeoutException ex) {

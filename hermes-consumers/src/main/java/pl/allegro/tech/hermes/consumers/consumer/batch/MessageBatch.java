@@ -12,6 +12,8 @@ public interface MessageBatch {
 
     void append(byte[] data, PartitionOffset offset) throws BufferOverflowException;
 
+    boolean canFit(byte[] data);
+
     boolean isReadyForDelivery();
 
     String getId();

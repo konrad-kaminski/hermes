@@ -4,7 +4,6 @@ import pl.allegro.tech.hermes.api.ContentType;
 import pl.allegro.tech.hermes.api.Subscription;
 import pl.allegro.tech.hermes.common.kafka.offset.PartitionOffset;
 
-import java.io.ByteArrayOutputStream;
 import java.nio.BufferOverflowException;
 import java.nio.ByteBuffer;
 import java.time.Clock;
@@ -52,7 +51,7 @@ public class JsonMessageBatch implements MessageBatch {
 
     @Override
     public void append(byte[] data, PartitionOffset offset) {
-        if (byteBuffer.remaining() < data.length + 2) {
+        if (!canFit(data)) {
             throw new BufferOverflowException();
         }
 
@@ -64,6 +63,11 @@ public class JsonMessageBatch implements MessageBatch {
         byteBuffer.put(data);
         partitionOffsets.add(offset);
         elements++;
+    }
+
+    @Override
+    public boolean canFit(byte[] data) {
+        return byteBuffer.remaining() >= data.length + 2;
     }
 
     @Override
