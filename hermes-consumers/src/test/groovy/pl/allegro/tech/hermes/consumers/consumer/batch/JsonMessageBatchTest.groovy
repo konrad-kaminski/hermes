@@ -15,7 +15,6 @@ class JsonMessageBatchTest extends Specification {
 
     static def LARGE_BATCH_SIZE = 100
     static def LARGE_BATCH_TIME = Integer.MAX_VALUE
-    static def LARGE_MESSAGE_TTL = Integer.MAX_VALUE
     static def LARGE_BATCH_VOLUME = 1024
 
     static def BATCH_ID = "1"
@@ -23,7 +22,7 @@ class JsonMessageBatchTest extends Specification {
     @Unroll
     def "should append data into buffer"() {
         given:
-        JsonMessageBatch batch = new JsonMessageBatch(BATCH_ID, ByteBuffer.allocate(capacity), LARGE_BATCH_SIZE, LARGE_BATCH_TIME, LARGE_MESSAGE_TTL, systemDefaultZone())
+        JsonMessageBatch batch = new JsonMessageBatch(BATCH_ID, ByteBuffer.allocate(capacity), LARGE_BATCH_SIZE, LARGE_BATCH_TIME, systemDefaultZone())
 
         when:
         data.each { it -> batch.append(it.bytes, Stub(PartitionOffset)) }
@@ -42,7 +41,7 @@ class JsonMessageBatchTest extends Specification {
     @Unroll
     def "should throw exception when there is no remaining space for given element"() {
         given:
-        JsonMessageBatch batch = new JsonMessageBatch(BATCH_ID, allocateDirect(capacity), LARGE_BATCH_SIZE, Integer.MAX_VALUE, Integer.MAX_VALUE, clock)
+        JsonMessageBatch batch = new JsonMessageBatch(BATCH_ID, allocateDirect(capacity), LARGE_BATCH_SIZE, LARGE_BATCH_TIME, systemDefaultZone())
 
         when:
         data.each { it -> batch.append(it.bytes, Stub(PartitionOffset)) }
@@ -66,7 +65,7 @@ class JsonMessageBatchTest extends Specification {
         def data = "xxx".bytes
 
         Clock clock = Stub() { millis() >>> [10, 20] }
-        JsonMessageBatch jsonMessageBatch = new JsonMessageBatch(BATCH_ID, allocateDirect(LARGE_BATCH_VOLUME), LARGE_BATCH_SIZE, batchTtl, LARGE_MESSAGE_TTL, clock)
+        JsonMessageBatch jsonMessageBatch = new JsonMessageBatch(BATCH_ID, allocateDirect(LARGE_BATCH_VOLUME), LARGE_BATCH_SIZE, batchTtl, clock)
 
         when:
         jsonMessageBatch.append(data, Stub(PartitionOffset))
@@ -82,7 +81,7 @@ class JsonMessageBatchTest extends Specification {
         Clock clock = Stub() { millis() >> { currentTime } }
 
         def batchTtl = 10
-        JsonMessageBatch jsonMessageBatch = new JsonMessageBatch(BATCH_ID, allocateDirect(LARGE_BATCH_VOLUME), LARGE_BATCH_SIZE, batchTtl, LARGE_MESSAGE_TTL, clock)
+        JsonMessageBatch jsonMessageBatch = new JsonMessageBatch(BATCH_ID, allocateDirect(LARGE_BATCH_VOLUME), LARGE_BATCH_SIZE, batchTtl, clock)
         currentTime = batchTtl + 1
 
         when:

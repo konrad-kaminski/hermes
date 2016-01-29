@@ -64,7 +64,7 @@ public class JsonMessageBatch implements MessageBatch {
 
     @Override
     public boolean isReadyForDelivery() {
-        return closed || isFull() || (clock.millis() - batchStart > maxBatchTime);
+        return closed || isFull() || (batchStart != 0 && clock.millis() - batchStart > maxBatchTime);
     }
 
     @Override
