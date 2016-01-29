@@ -6,6 +6,7 @@ import com.github.rholder.retry.RetryerBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import pl.allegro.tech.hermes.api.Subscription;
+import pl.allegro.tech.hermes.api.SubscriptionPolicy;
 import pl.allegro.tech.hermes.common.kafka.offset.PartitionOffset;
 import pl.allegro.tech.hermes.consumers.consumer.batch.MessageBatch;
 import pl.allegro.tech.hermes.consumers.consumer.batch.MessageBatchFactory;
@@ -21,6 +22,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 
 import static com.github.rholder.retry.WaitStrategies.fibonacciWait;
+import static java.lang.String.format;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 
 public class BatchConsumer implements Consumer {
@@ -31,7 +33,6 @@ public class BatchConsumer implements Consumer {
     private final SubscriptionOffsetCommitQueues offsets;
     private final CountDownLatch stoppedLatch = new CountDownLatch(1);
     private final MessageBatchReceiver receiver;
-    private final Retryer<MessageSendingResult> retryer;
 
     private Subscription subscription;
     boolean consuming = true;
@@ -47,22 +48,15 @@ public class BatchConsumer implements Consumer {
         this.batchFactory = batchFactory;
         this.offsets = offsets;
         this.subscription = subscription;
-        this.retryer = RetryerBuilder.<MessageSendingResult>newBuilder()
-                .retryIfExceptionOfType(IOException.class)
-                .retryIfRuntimeException()
-                .retryIfResult(this::isRetryRequired)
-                .withWaitStrategy(fibonacciWait(subscription.getSubscriptionPolicy().getMessageBackoff(),
-                                  subscription.getSubscriptionPolicy().getMessageTtl(), MILLISECONDS))
-                .withStopStrategy(att -> att.getDelaySinceFirstAttempt() > subscription.getSubscriptionPolicy().getMessageTtl())
-                .build();
     }
 
     @Override
     public void run() {
         setThreadName();
+        Retryer<MessageSendingResult> retryer = createRetryer(subscription.getSubscriptionPolicy());
         do {
             MessageBatch batch = receiver.next(subscription);
-            deliver(batch);
+            deliver(batch, retryer);
             offsets.putAll(batch.getPartitionOffsets());
             batchFactory.destroyBatch(batch);
         } while (isConsuming());
@@ -71,19 +65,26 @@ public class BatchConsumer implements Consumer {
         stoppedLatch.countDown();
     }
 
-    private void deliver(MessageBatch batch) {
+    private void deliver(MessageBatch batch, Retryer<MessageSendingResult> retryer) {
         try {
             retryer.call(() -> sender.send(batch, subscription.getEndpoint()));
         } catch (ExecutionException | RetryException e) {
-            //TODO
-            //tracing
+            logger.error(format("[batch_id=%s, subscription=%s] Batch was rejected.", batch.getId(), subscription.toSubscriptionName()), e);
         }
     }
 
-    private boolean isRetryRequired(MessageSendingResult result) {
-        return isConsuming() &&
-                !result.succeeded() &&
-                (!result.isClientError() || subscription.getSubscriptionPolicy().isRetryClientErrors());
+    private Retryer<MessageSendingResult> createRetryer(SubscriptionPolicy policy) {
+        return createRetryer(policy.getMessageBackoff(), policy.getMessageTtl(), policy.isRetryClientErrors());
+    }
+
+    private Retryer<MessageSendingResult> createRetryer(int messageBackoff, int messageTtl, boolean retryClientErrors) {
+        return RetryerBuilder.<MessageSendingResult>newBuilder()
+                .retryIfExceptionOfType(IOException.class)
+                .retryIfRuntimeException()
+                .retryIfResult(result -> isConsuming() && !result.succeeded() && (!result.isClientError() || retryClientErrors))
+                .withWaitStrategy(fibonacciWait(messageBackoff, messageTtl, MILLISECONDS))
+                .withStopStrategy(attempt -> attempt.getDelaySinceFirstAttempt() > messageTtl)
+                .build();
     }
 
     @Override
