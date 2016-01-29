@@ -21,7 +21,7 @@ import pl.allegro.tech.hermes.consumers.consumer.rate.calculator.OutputRateCalcu
 import pl.allegro.tech.hermes.consumers.consumer.receiver.MessageReceiver;
 import pl.allegro.tech.hermes.consumers.consumer.receiver.ReceiverFactory;
 import pl.allegro.tech.hermes.consumers.consumer.sender.MessageBatchSender;
-import pl.allegro.tech.hermes.consumers.consumer.sender.http.JettyMessageBatchSender;
+import pl.allegro.tech.hermes.consumers.consumer.sender.http.ApacheMessageBatchSender;
 import pl.allegro.tech.hermes.domain.topic.TopicRepository;
 import pl.allegro.tech.hermes.tracker.consumers.Trackers;
 
@@ -86,8 +86,7 @@ public class ConsumerFactory {
 
         if (DeliveryType.BATCH == subscription.getSubscriptionPolicy().getDeliveryType()) {
             Clock clock = Clock.systemUTC();
-            HttpClient client = new HttpClient();
-            MessageBatchSender sender = new JettyMessageBatchSender(client, 5000);
+            MessageBatchSender sender = new ApacheMessageBatchSender();
             MessageBatchFactory batchFactory = new ByteBufferMessageBatchFactory(0, 1024, 64*1024, clock);
             return new BatchConsumer(messageReceiver, sender, batchFactory, messageBatchWrapper, subscriptionOffsetCommitQueues, subscription, clock);
         } else {
