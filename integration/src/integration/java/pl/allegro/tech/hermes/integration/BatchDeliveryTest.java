@@ -17,6 +17,7 @@ import static javax.ws.rs.core.Response.Status.CREATED;
 import static pl.allegro.tech.hermes.integration.test.HermesAssertions.assertThat;
 
 public class BatchDeliveryTest extends IntegrationTest {
+    private static final int LARGE_MESSAGE_TTL = 100 * 1000;
     private RemoteServiceEndpoint remoteService;
 
     private ObjectMapper mapper = new ObjectMapper();
@@ -40,7 +41,7 @@ public class BatchDeliveryTest extends IntegrationTest {
     public void shouldDeliverMessagesInBatch() throws IOException {
         // given
         Topic topic = operations.buildTopic("batchSizeTest", "topic");
-        operations.createBatchSubscription(topic, HTTP_ENDPOINT_URL, SMALL_BATCH_SIZE, LARGE_BATCH_TIME, LARGE_BATCH_VOLUME);
+        operations.createBatchSubscription(topic, HTTP_ENDPOINT_URL, LARGE_MESSAGE_TTL, SMALL_BATCH_SIZE, LARGE_BATCH_TIME, LARGE_BATCH_VOLUME);
         remoteService.expectMessages(SMALL_BATCH);
 
         // when
@@ -54,7 +55,7 @@ public class BatchDeliveryTest extends IntegrationTest {
     public void shouldDeliverBatchInGivenTimePeriod() throws IOException {
         // given
         Topic topic = operations.buildTopic("deliverBatchInGivenTimePeriod", "topic");
-        operations.createBatchSubscription(topic, HTTP_ENDPOINT_URL, LARGE_BATCH_SIZE, SMALL_BATCH_TIME, LARGE_BATCH_VOLUME);
+        operations.createBatchSubscription(topic, HTTP_ENDPOINT_URL, LARGE_MESSAGE_TTL, LARGE_BATCH_SIZE, SMALL_BATCH_TIME, LARGE_BATCH_VOLUME);
         remoteService.expectMessages(SINGLE_MESSAGE);
 
         // when
@@ -69,7 +70,7 @@ public class BatchDeliveryTest extends IntegrationTest {
         // given
         Topic topic = operations.buildTopic("deliverBatchInGivenVolume", "topic");
         int batchVolumeThatFitsOneMessageOnly = SINGLE_MESSAGE.wrap().toString().getBytes().length + 5;
-        operations.createBatchSubscription(topic, HTTP_ENDPOINT_URL, LARGE_BATCH_SIZE, LARGE_BATCH_TIME, batchVolumeThatFitsOneMessageOnly);
+        operations.createBatchSubscription(topic, HTTP_ENDPOINT_URL, LARGE_MESSAGE_TTL, LARGE_BATCH_SIZE, LARGE_BATCH_TIME, batchVolumeThatFitsOneMessageOnly);
         remoteService.expectMessages(SINGLE_MESSAGE);
 
         // when publishing more than buffer capacity
@@ -85,7 +86,7 @@ public class BatchDeliveryTest extends IntegrationTest {
     }
 
     private void expectSingleBatch(TestMessage... expectedContents) {
-        remoteService.waitUntilReceived(10, 1, message -> {
+        remoteService.waitUntilReceived(1000, 1, message -> {
             List<Map<String, Object>> batch = readBatch(message);
             assertThat(batch).hasSize(expectedContents.length);
             for (int i = 0; i < expectedContents.length; i++) {

@@ -1,5 +1,8 @@
 package pl.allegro.tech.hermes.consumers.consumer;
 
+import com.github.rholder.retry.RetryException;
+import com.github.rholder.retry.Retryer;
+import com.github.rholder.retry.RetryerBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import pl.allegro.tech.hermes.api.Subscription;
@@ -12,38 +15,46 @@ import pl.allegro.tech.hermes.consumers.consumer.receiver.MessageReceiver;
 import pl.allegro.tech.hermes.consumers.consumer.sender.MessageBatchSender;
 import pl.allegro.tech.hermes.consumers.consumer.sender.MessageSendingResult;
 
-import java.time.Clock;
+import java.io.IOException;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
+
+import static com.github.rholder.retry.WaitStrategies.fibonacciWait;
+import static java.util.concurrent.TimeUnit.MILLISECONDS;
 
 public class BatchConsumer implements Consumer {
     private static final Logger logger = LoggerFactory.getLogger(BatchConsumer.class);
 
     private final MessageBatchSender sender;
     private final MessageBatchFactory batchFactory;
-
-    private final Clock clock;
     private final SubscriptionOffsetCommitQueues offsets;
-    private Subscription subscription;
-
     private final CountDownLatch stoppedLatch = new CountDownLatch(1);
-    boolean consuming = true;
+    private final MessageBatchReceiver receiver;
+    private final Retryer<MessageSendingResult> retryer;
 
-    private MessageBatchReceiver receiver;
+    private Subscription subscription;
+    boolean consuming = true;
 
     public BatchConsumer(MessageReceiver receiver,
                          MessageBatchSender sender,
                          MessageBatchFactory batchFactory,
                          MessageBatchWrapper messageBatchWrapper,
                          SubscriptionOffsetCommitQueues offsets,
-                         Subscription subscription,
-                         Clock clock) {
+                         Subscription subscription) {
         this.receiver = new MessageBatchReceiver(receiver, batchFactory, messageBatchWrapper);
         this.sender = sender;
         this.batchFactory = batchFactory;
         this.offsets = offsets;
         this.subscription = subscription;
-        this.clock = clock;
+        this.retryer = RetryerBuilder.<MessageSendingResult>newBuilder()
+                .retryIfExceptionOfType(IOException.class)
+                .retryIfRuntimeException()
+                .retryIfResult(this::isRetryRequired)
+                .withWaitStrategy(fibonacciWait(subscription.getSubscriptionPolicy().getMessageBackoff(),
+                                  subscription.getSubscriptionPolicy().getMessageTtl(), MILLISECONDS))
+                .withStopStrategy(att -> att.getDelaySinceFirstAttempt() > subscription.getSubscriptionPolicy().getMessageTtl())
+                .build();
     }
 
     @Override
@@ -51,7 +62,7 @@ public class BatchConsumer implements Consumer {
         setThreadName();
         do {
             MessageBatch batch = receiver.next(subscription);
-            deliver(batch, clock.millis());
+            deliver(batch);
             offsets.putAll(batch.getPartitionOffsets());
             batchFactory.destroyBatch(batch);
         } while (isConsuming());
@@ -60,16 +71,13 @@ public class BatchConsumer implements Consumer {
         stoppedLatch.countDown();
     }
 
-    private void deliver(MessageBatch batch, long deliveryStartTime) {
-        boolean isRetryRequired;
-        do {
-            MessageSendingResult result = sender.send(batch, subscription.getEndpoint());
-            isRetryRequired = isRetryRequired(result);
-        } while (isRetryRequired && !isTtlExceeded(deliveryStartTime));
-    }
-
-    private boolean isTtlExceeded(long deliveryStartTime) {
-        return clock.millis() - deliveryStartTime > subscription.getSubscriptionPolicy().getMessageTtl();
+    private void deliver(MessageBatch batch) {
+        try {
+            retryer.call(() -> sender.send(batch, subscription.getEndpoint()));
+        } catch (ExecutionException | RetryException e) {
+            //TODO
+            //tracing
+        }
     }
 
     private boolean isRetryRequired(MessageSendingResult result) {

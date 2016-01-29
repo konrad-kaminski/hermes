@@ -85,10 +85,9 @@ public class ConsumerFactory {
         MessageReceiver messageReceiver = messageReceiverFactory.createMessageReceiver(topic, subscription);
 
         if (DeliveryType.BATCH == subscription.getSubscriptionPolicy().getDeliveryType()) {
-            Clock clock = Clock.systemUTC();
             MessageBatchSender sender = new ApacheMessageBatchSender();
             MessageBatchFactory batchFactory = new ByteBufferMessageBatchFactory(0, 1024, 64*1024, clock);
-            return new BatchConsumer(messageReceiver, sender, batchFactory, messageBatchWrapper, subscriptionOffsetCommitQueues, subscription, clock);
+            return new BatchConsumer(messageReceiver, sender, batchFactory, messageBatchWrapper, subscriptionOffsetCommitQueues, subscription);
         } else {
             return new SerialConsumer(
                     messageReceiver,
