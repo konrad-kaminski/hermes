@@ -1,6 +1,8 @@
 package pl.allegro.tech.hermes.consumers.consumer.batch;
 
 import pl.allegro.tech.hermes.api.Subscription;
+import pl.allegro.tech.hermes.common.metric.Gauges;
+import pl.allegro.tech.hermes.common.metric.HermesMetrics;
 
 import java.nio.ByteBuffer;
 import java.time.Clock;
@@ -12,9 +14,11 @@ public class ByteBufferMessageBatchFactory implements MessageBatchFactory {
     private final DirectBufferPool bufferPool;
     private final Clock clock;
 
-    public ByteBufferMessageBatchFactory(int poolableSize, int maxPoolSize, Clock clock) {
+    public ByteBufferMessageBatchFactory(int poolableSize, int maxPoolSize, Clock clock, HermesMetrics hermesMetrics) {
         this.clock = clock;
         this.bufferPool = new DirectBufferPool(maxPoolSize, poolableSize, true);
+        hermesMetrics.registerGauge(Gauges.BATCH_BUFFER_TOTAL_BYTES, bufferPool::totalMemory);
+        hermesMetrics.registerGauge(Gauges.BATCH_BUFFER_AVAILABLE_BYTES, bufferPool::availableMemory);
     }
 
     @Override
