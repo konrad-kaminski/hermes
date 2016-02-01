@@ -101,4 +101,9 @@ public class JsonMessageBatch implements MessageBatch {
     public int size() {
         return batchSize;
     }
+
+    @Override
+    public long startTime() {
+        return batchStart;
+    }
 }

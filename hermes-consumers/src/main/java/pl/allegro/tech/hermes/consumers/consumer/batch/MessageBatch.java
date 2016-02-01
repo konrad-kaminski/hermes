@@ -27,4 +27,6 @@ public interface MessageBatch {
     List<PartitionOffset> getPartitionOffsets();
 
     int size();
+
+    long startTime();
 }

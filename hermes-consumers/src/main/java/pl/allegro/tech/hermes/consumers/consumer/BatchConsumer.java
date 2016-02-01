@@ -1,9 +1,9 @@
 package pl.allegro.tech.hermes.consumers.consumer;
 
+import com.codahale.metrics.Timer;
 import com.github.rholder.retry.RetryException;
 import com.github.rholder.retry.Retryer;
 import com.github.rholder.retry.RetryerBuilder;
-import com.google.common.base.Stopwatch;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import pl.allegro.tech.hermes.api.Subscription;
@@ -12,6 +12,7 @@ import pl.allegro.tech.hermes.common.kafka.offset.PartitionOffset;
 import pl.allegro.tech.hermes.common.metric.Counters;
 import pl.allegro.tech.hermes.common.metric.HermesMetrics;
 import pl.allegro.tech.hermes.common.metric.Meters;
+import pl.allegro.tech.hermes.common.metric.Timers;
 import pl.allegro.tech.hermes.consumers.consumer.batch.MessageBatch;
 import pl.allegro.tech.hermes.consumers.consumer.batch.MessageBatchFactory;
 import pl.allegro.tech.hermes.consumers.consumer.batch.MessageBatchReceiver;
@@ -65,10 +66,16 @@ public class BatchConsumer implements Consumer {
         Retryer<MessageSendingResult> retryer = createRetryer(subscription.getSubscriptionPolicy());
         do {
             MessageBatch batch = receiver.next(subscription);
+
+            Timer.Context timer = hermesMetrics.timer(Timers.SUBSCRIPTION_LATENCY, subscription.getTopicName(), subscription.getName()).time();
             deliver(batch, retryer);
+            timer.stop();
+
             offsets.putAllDelivered(batch.getPartitionOffsets());
             batchFactory.destroyBatch(batch);
+
             hermesMetrics.decrementInflightCounter(subscription, batch.size());
+            hermesMetrics.inflightTimeHistogram(subscription).update(System.currentTimeMillis() - batch.startTime());
         } while (isConsuming());
         logger.info("Stopped consumer for subscription {}", subscription.getId());
         unsetThreadName();
@@ -76,9 +83,8 @@ public class BatchConsumer implements Consumer {
     }
 
     private void deliver(MessageBatch batch, Retryer<MessageSendingResult> retryer) {
-        Stopwatch stopwatch = Stopwatch.createUnstarted();
         try {
-            stopwatch.start();
+
             MessageSendingResult finalResult = retryer.call(() -> {
                 MessageSendingResult result = sender.send(batch, subscription.getEndpoint());
                 hermesMetrics.registerConsumerHttpAnswer(subscription, result.getStatusCode());
@@ -93,8 +99,6 @@ public class BatchConsumer implements Consumer {
         } catch (ExecutionException | RetryException e) {
             logger.error(format("[batch_id=%s, subscription=%s] Batch was rejected.", batch.getId(), subscription.toSubscriptionName()), e);
             markDiscarded(batch);
-        } finally {
-            hermesMetrics.inflightTimeHistogram(subscription).update(stopwatch.stop().elapsed(TimeUnit.MILLISECONDS));
         }
     }
 
