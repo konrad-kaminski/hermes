@@ -49,8 +49,13 @@ public class SubscriptionOffsetCommitQueues {
         return offsets;
     }
 
-    public void putAll(List<PartitionOffset> partitionOffsets) {
-        partitionOffsets.forEach(this::put);
+    public void putAllDelivered(List<PartitionOffset> partitionOffsets) {
+        partitionOffsets.forEach(this::putDelivered);
+    }
+
+    public void putDelivered(PartitionOffset partitionOffset) {
+        OffsetCommitQueue helper = queues.getUnchecked(new TopicPartition(partitionOffset.getTopic(), partitionOffset.getPartition()));
+        helper.markDelivered(partitionOffset.getOffset());
     }
 
     private static final class OffsetCommitQueueLoader extends CacheLoader<TopicPartition, OffsetCommitQueue> {

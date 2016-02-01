@@ -96,4 +96,9 @@ public class JsonMessageBatch implements MessageBatch {
     public List<PartitionOffset> getPartitionOffsets() {
         return partitionOffsets;
     }
+
+    @Override
+    public int size() {
+        return batchSize;
+    }
 }

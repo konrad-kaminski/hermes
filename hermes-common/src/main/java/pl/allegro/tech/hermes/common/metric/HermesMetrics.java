@@ -184,6 +184,10 @@ public class HermesMetrics {
         getInflightCounter(subscription).dec();
     }
 
+    public void decrementInflightCounter(Subscription subscription, int size) {
+        getInflightCounter(subscription).dec(size);
+    }
+
     public static void close(Timer.Context... timers) {
         for (Timer.Context timer : timers) {
             if (timer != null) {

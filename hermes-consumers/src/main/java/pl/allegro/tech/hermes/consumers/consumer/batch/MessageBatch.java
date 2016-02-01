@@ -25,4 +25,6 @@ public interface MessageBatch {
     ByteBuffer getContent();
 
     List<PartitionOffset> getPartitionOffsets();
+
+    int size();
 }

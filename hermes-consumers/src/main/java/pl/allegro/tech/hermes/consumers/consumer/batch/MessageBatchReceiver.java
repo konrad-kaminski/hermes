@@ -1,6 +1,7 @@
 package pl.allegro.tech.hermes.consumers.consumer.batch;
 
 import pl.allegro.tech.hermes.api.Subscription;
+import pl.allegro.tech.hermes.common.metric.HermesMetrics;
 import pl.allegro.tech.hermes.consumers.consumer.Message;
 import pl.allegro.tech.hermes.consumers.consumer.MessageBatchWrapper;
 import pl.allegro.tech.hermes.consumers.consumer.receiver.MessageReceiver;
@@ -13,15 +14,18 @@ public class MessageBatchReceiver {
     private final MessageReceiver receiver;
     private final MessageBatchFactory batchFactory;
     private final MessageBatchWrapper messageBatchWrapper;
+    private final HermesMetrics hermesMetrics;
     private final Queue<Message> inflight;
     private boolean receiving = true;
 
     public MessageBatchReceiver(MessageReceiver receiver,
                                 MessageBatchFactory batchFactory,
-                                MessageBatchWrapper messageBatchWrapper) {
+                                MessageBatchWrapper messageBatchWrapper,
+                                HermesMetrics hermesMetrics) {
         this.receiver = receiver;
         this.batchFactory = batchFactory;
         this.messageBatchWrapper = messageBatchWrapper;
+        this.hermesMetrics = hermesMetrics;
         this.inflight = new ArrayDeque<>(1);
     }
 
@@ -29,7 +33,7 @@ public class MessageBatchReceiver {
         MessageBatch batch = batchFactory.createBatch(subscription);
         while (isReceiving() && !batch.isReadyForDelivery()) {
             try {
-                Message message = inflight.isEmpty() ? receiver.next() : inflight.poll();
+                Message message = inflight.isEmpty() ? receive(subscription) : inflight.poll();
                 byte[] data = messageBatchWrapper.wrap(message);
                 if (batch.canFit(data)) {
                     batch.append(data, message.getPartitionOffset());
@@ -42,6 +46,12 @@ public class MessageBatchReceiver {
             }
         }
         return batch.close();
+    }
+
+    private Message receive(Subscription subscription) {
+        Message next = receiver.next();
+        hermesMetrics.incrementInflightCounter(subscription);
+        return next;
     }
 
     private boolean isReceiving() {
