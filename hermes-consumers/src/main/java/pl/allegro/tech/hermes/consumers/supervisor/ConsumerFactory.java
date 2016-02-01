@@ -86,7 +86,7 @@ public class ConsumerFactory {
 
         if (DeliveryType.BATCH == subscription.getSubscriptionPolicy().getDeliveryType()) {
             MessageBatchSender sender = new ApacheMessageBatchSender();
-            MessageBatchFactory batchFactory = new ByteBufferMessageBatchFactory(0, 1024, 64*1024, clock);
+            MessageBatchFactory batchFactory = new ByteBufferMessageBatchFactory(1024, 64*1024, clock);
             return new BatchConsumer(messageReceiver,
                     sender,
                     batchFactory,
