@@ -12,7 +12,6 @@ import pl.allegro.tech.hermes.api.Subscription;
 import pl.allegro.tech.hermes.api.SubscriptionPolicy;
 import pl.allegro.tech.hermes.common.kafka.offset.PartitionOffset;
 import pl.allegro.tech.hermes.common.metric.HermesMetrics;
-import pl.allegro.tech.hermes.common.metric.Meters;
 import pl.allegro.tech.hermes.consumers.consumer.batch.BatchEcosystem;
 import pl.allegro.tech.hermes.consumers.consumer.batch.MessageBatch;
 import pl.allegro.tech.hermes.consumers.consumer.batch.MessageBatchFactory;
@@ -88,22 +87,6 @@ public class BatchConsumer implements Consumer {
         stoppedLatch.countDown();
     }
 
-    private void clean(MessageBatch batch) {
-        batchFactory.destroyBatch(batch);
-        ecosystem.closeInflightMetrics(batch, subscription);
-    }
-
-    private void deliver(MessageBatch batch, Retryer<MessageSendingResult> retryer) {
-        try (Timer.Context timer = hermesMetrics.subscriptionLatencyTimer(subscription).time()) {
-            MessageSendingResult result = retryer.call(() -> sender.send(batch, subscription.getEndpoint()));
-            hermesMetrics.registerConsumerHttpAnswer(subscription, result.getStatusCode());
-            ecosystem.markSendingResult(result, subscription, batch);
-        } catch (ExecutionException | RetryException e) {
-            logger.error(format("[batch_id=%s, subscription=%s] Batch was rejected.", batch.getId(), subscription.toSubscriptionName()), e);
-            ecosystem.markDiscarded(batch, subscription, e.getMessage());
-        }
-    }
-
     private Retryer<MessageSendingResult> createRetryer(MessageBatch batch, SubscriptionPolicy policy) {
         return createRetryer(batch, policy.getMessageBackoff(), policy.getMessageTtl(), policy.isRetryClientErrors());
     }
@@ -115,32 +98,24 @@ public class BatchConsumer implements Consumer {
                 .retryIfResult(result -> isConsuming() && !result.succeeded() && (!result.isClientError() || retryClientErrors))
                 .withWaitStrategy(fibonacciWait(messageBackoff, messageTtl, MILLISECONDS))
                 .withStopStrategy(attempt -> attempt.getDelaySinceFirstAttempt() > messageTtl)
-                .withRetryListener(new RetryListener() {
-                    @Override
-                    public <V> void onRetry(Attempt<V> attempt) {
-                        markFailed(batch, (MessageSendingResult) attempt.getResult());
-                    }
-                })
+                .withRetryListener(getRetryListener(result -> ecosystem.markFailed(batch, subscription, result)))
                 .build();
     }
 
-    private void markFailed(MessageBatch batch, MessageSendingResult result) {
-        hermesMetrics.registerConsumerHttpAnswer(subscription, result.getStatusCode());
-        hermesMetrics.meter(Meters.FAILED_METER_SUBSCRIPTION, subscription.getTopicName(), subscription.getName()).mark();
-        registerFailureMetrics(subscription, result);
-        batch.getMessagesMetadata().forEach(m -> trackers.get(subscription).logFailed(m, result.getRootCause()));
-    }
-
-    private void registerFailureMetrics(Subscription subscription, MessageSendingResult result) {
-        if (result.hasHttpAnswer()) {
-            hermesMetrics.registerConsumerHttpAnswer(subscription, result.getStatusCode());
-        } else if (result.isTimeout()) {
-            hermesMetrics.consumerErrorsTimeoutMeter(subscription).mark();
-        } else {
-            hermesMetrics.consumerErrorsOtherMeter(subscription).mark();
+    private void deliver(MessageBatch batch, Retryer<MessageSendingResult> retryer) {
+        try (Timer.Context timer = hermesMetrics.subscriptionLatencyTimer(subscription).time()) {
+            MessageSendingResult result = retryer.call(() -> sender.send(batch, subscription.getEndpoint()));
+            ecosystem.markSendingResult(batch, subscription, result);
+        } catch (ExecutionException | RetryException e) {
+            logger.error(format("[batch_id=%s, subscription=%s] Batch was rejected.", batch.getId(), subscription.toSubscriptionName()), e);
+            ecosystem.markDiscarded(batch, subscription, e.getMessage());
         }
     }
 
+    private void clean(MessageBatch batch) {
+        batchFactory.destroyBatch(batch);
+        ecosystem.closeInflightMetrics(batch, subscription);
+    }
 
     @Override
     public Subscription getSubscription() {
@@ -172,5 +147,14 @@ public class BatchConsumer implements Consumer {
     @Override
     public boolean isConsuming() {
         return consuming;
+    }
+
+    private RetryListener getRetryListener(java.util.function.Consumer<MessageSendingResult> consumer) {
+        return new RetryListener() {
+            @Override
+            public <V> void onRetry(Attempt<V> attempt) {
+                consumer.accept((MessageSendingResult) attempt.getResult());
+            }
+        };
     }
 }

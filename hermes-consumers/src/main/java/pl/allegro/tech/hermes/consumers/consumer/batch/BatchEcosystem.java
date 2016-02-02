@@ -25,7 +25,8 @@ public class BatchEcosystem {
         metrics.inflightTimeHistogram(subscription).update(batch.getLifetime());
     }
 
-    public void markSendingResult(MessageSendingResult result, Subscription subscription, MessageBatch batch) {
+    public void markSendingResult(MessageBatch batch, Subscription subscription, MessageSendingResult result) {
+        metrics.registerConsumerHttpAnswer(subscription, result.getStatusCode());
         if (result.succeeded()) {
             markDelivered(batch, subscription);
         } else {
@@ -48,5 +49,22 @@ public class BatchEcosystem {
         metrics.meter(Meters.DISCARDED_SUBSCRIPTION_METER, subscription.getTopicName(), subscription.getName()).mark(batch.size());
         metrics.decrementInflightCounter(subscription);
         batch.getMessagesMetadata().forEach(m -> trackers.get(subscription).logDiscarded(m, reason));
+    }
+
+    public void markFailed(MessageBatch batch, Subscription subscription, MessageSendingResult result) {
+        metrics.registerConsumerHttpAnswer(subscription, result.getStatusCode());
+        metrics.meter(Meters.FAILED_METER_SUBSCRIPTION, subscription.getTopicName(), subscription.getName()).mark();
+        registerFailureMetrics(subscription, result);
+        batch.getMessagesMetadata().forEach(m -> trackers.get(subscription).logFailed(m, result.getRootCause()));
+    }
+
+    private void registerFailureMetrics(Subscription subscription, MessageSendingResult result) {
+        if (result.hasHttpAnswer()) {
+            metrics.registerConsumerHttpAnswer(subscription, result.getStatusCode());
+        } else if (result.isTimeout()) {
+            metrics.consumerErrorsTimeoutMeter(subscription).mark();
+        } else {
+            metrics.consumerErrorsOtherMeter(subscription).mark();
+        }
     }
 }
