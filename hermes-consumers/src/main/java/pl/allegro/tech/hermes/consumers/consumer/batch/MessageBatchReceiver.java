@@ -1,5 +1,8 @@
 package pl.allegro.tech.hermes.consumers.consumer.batch;
 
+import com.google.common.base.Preconditions;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import pl.allegro.tech.hermes.api.Subscription;
 import pl.allegro.tech.hermes.common.metric.HermesMetrics;
 import pl.allegro.tech.hermes.consumers.consumer.Message;
@@ -12,7 +15,11 @@ import pl.allegro.tech.hermes.tracker.consumers.Trackers;
 import java.util.ArrayDeque;
 import java.util.Queue;
 
+import static com.google.common.base.Preconditions.checkArgument;
+
 public class MessageBatchReceiver {
+    private static final Logger logger = LoggerFactory.getLogger(MessageBatchReceiver.class);
+
     private final MessageReceiver receiver;
     private final MessageBatchFactory batchFactory;
     private final MessageBatchWrapper messageBatchWrapper;
@@ -35,7 +42,9 @@ public class MessageBatchReceiver {
     }
 
     public MessageBatch next(Subscription subscription) {
+        logger.info("Trying to allocate memory for new batch for subscription {}", subscription.getId());
         MessageBatch batch = batchFactory.createBatch(subscription);
+        logger.info("New batch allocated for subscription {}", subscription.getId());
         while (isReceiving() && !batch.isReadyForDelivery()) {
             try {
                 Message message = inflight.isEmpty() ? receive(subscription, batch.getId()) : inflight.poll();
@@ -43,13 +52,15 @@ public class MessageBatchReceiver {
                 if (batch.canFit(data)) {
                     batch.append(data, messageMetadata(subscription, batch.getId(), message));
                 } else {
-                    inflight.offer(message);
+                    logger.info("Message too large (size={}) for current batch for subscription {}", data.length, subscription.getId());
+                    checkArgument(inflight.offer(message));
                     break;
                 }
             } catch (MessageReceivingTimeoutException ex) {
                 // ignore
             }
         }
+        logger.info("Batch is ready for delivery for subscription {}", subscription.getId());
         return batch.close();
     }
 
