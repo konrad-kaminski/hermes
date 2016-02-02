@@ -20,17 +20,19 @@ import pl.allegro.tech.hermes.consumers.consumer.offset.SubscriptionOffsetCommit
 import pl.allegro.tech.hermes.consumers.consumer.receiver.MessageReceiver;
 import pl.allegro.tech.hermes.consumers.consumer.sender.MessageBatchSender;
 import pl.allegro.tech.hermes.consumers.consumer.sender.MessageSendingResult;
+import pl.allegro.tech.hermes.tracker.consumers.Trackers;
 
 import java.io.IOException;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
 
 import static com.github.rholder.retry.WaitStrategies.fibonacciWait;
 import static java.lang.String.format;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
-import static pl.allegro.tech.hermes.common.metric.Meters.*;
+import static pl.allegro.tech.hermes.common.metric.Meters.METER;
+import static pl.allegro.tech.hermes.common.metric.Meters.SUBSCRIPTION_METER;
+import static pl.allegro.tech.hermes.common.metric.Meters.TOPIC_METER;
 
 public class BatchConsumer implements Consumer {
     private static final Logger logger = LoggerFactory.getLogger(BatchConsumer.class);
@@ -41,6 +43,7 @@ public class BatchConsumer implements Consumer {
     private final CountDownLatch stoppedLatch = new CountDownLatch(1);
     private final MessageBatchReceiver receiver;
     private final HermesMetrics hermesMetrics;
+    private final Trackers trackers;
 
     private Subscription subscription;
     boolean consuming = true;
@@ -51,8 +54,10 @@ public class BatchConsumer implements Consumer {
                          MessageBatchWrapper messageBatchWrapper,
                          SubscriptionOffsetCommitQueues offsets,
                          HermesMetrics hermesMetrics,
+                         Trackers trackers,
                          Subscription subscription) {
-        this.receiver = new MessageBatchReceiver(receiver, batchFactory, messageBatchWrapper, hermesMetrics);
+        this.trackers = trackers;
+        this.receiver = new MessageBatchReceiver(receiver, batchFactory, messageBatchWrapper, hermesMetrics, trackers);
         this.sender = sender;
         this.batchFactory = batchFactory;
         this.offsets = offsets;
@@ -84,10 +89,14 @@ public class BatchConsumer implements Consumer {
 
     private void deliver(MessageBatch batch, Retryer<MessageSendingResult> retryer) {
         try {
-
             MessageSendingResult finalResult = retryer.call(() -> {
                 MessageSendingResult result = sender.send(batch, subscription.getEndpoint());
                 hermesMetrics.registerConsumerHttpAnswer(subscription, result.getStatusCode());
+
+                if (!result.succeeded()) {
+                    markFailed(batch, result);
+                }
+
                 return result;
             });
 
@@ -102,11 +111,28 @@ public class BatchConsumer implements Consumer {
         }
     }
 
+    private void markFailed(MessageBatch batch, MessageSendingResult result) {
+        hermesMetrics.meter(Meters.FAILED_METER_SUBSCRIPTION, subscription.getTopicName(), subscription.getName()).mark();
+        registerFailureMetrics(subscription, result);
+        batch.getMessagesMetadata().forEach(m -> trackers.get(subscription).logFailed(m, result.getRootCause()));
+    }
+
+    private void registerFailureMetrics(Subscription subscription, MessageSendingResult result) {
+        if (result.hasHttpAnswer()) {
+            hermesMetrics.registerConsumerHttpAnswer(subscription, result.getStatusCode());
+        } else if (result.isTimeout()) {
+            hermesMetrics.consumerErrorsTimeoutMeter(subscription).mark();
+        } else {
+            hermesMetrics.consumerErrorsOtherMeter(subscription).mark();
+        }
+    }
+
     private void markDelivered(MessageBatch batch) {
         hermesMetrics.meter(METER).mark(batch.size());
         hermesMetrics.meter(TOPIC_METER, subscription.getTopicName()).mark(batch.size());
         hermesMetrics.meter(SUBSCRIPTION_METER, subscription.getTopicName(), subscription.getName()).mark(batch.size());
         hermesMetrics.counter(Counters.DELIVERED, subscription.getTopicName(), subscription.getName()).inc(batch.size());
+        batch.getMessagesMetadata().forEach(m -> trackers.get(subscription).logSent(m));
     }
 
     private void markDiscarded(MessageBatch batch) {

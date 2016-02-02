@@ -2,6 +2,7 @@ package pl.allegro.tech.hermes.consumers.consumer.batch;
 
 import pl.allegro.tech.hermes.api.ContentType;
 import pl.allegro.tech.hermes.common.kafka.offset.PartitionOffset;
+import pl.allegro.tech.hermes.tracker.consumers.BatchMessageMetadata;
 
 import java.nio.BufferOverflowException;
 import java.nio.ByteBuffer;
@@ -10,7 +11,7 @@ import java.util.List;
 public interface MessageBatch {
     boolean isFull();
 
-    void append(byte[] data, PartitionOffset offset) throws BufferOverflowException;
+    void append(byte[] data, BatchMessageMetadata batchMessageMetadata) throws BufferOverflowException;
 
     boolean canFit(byte[] data);
 
@@ -29,4 +30,6 @@ public interface MessageBatch {
     int size();
 
     long startTime();
+
+    List<BatchMessageMetadata> getMessagesMetadata();
 }

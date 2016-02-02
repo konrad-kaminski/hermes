@@ -93,6 +93,7 @@ public class ConsumerFactory {
                     messageBatchWrapper,
                     subscriptionOffsetCommitQueues,
                     hermesMetrics,
+                    trackers,
                     subscription);
         } else {
             return new SerialConsumer(

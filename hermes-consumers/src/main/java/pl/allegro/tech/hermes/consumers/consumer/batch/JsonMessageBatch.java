@@ -2,13 +2,17 @@ package pl.allegro.tech.hermes.consumers.consumer.batch;
 
 import pl.allegro.tech.hermes.api.ContentType;
 import pl.allegro.tech.hermes.api.Subscription;
+import pl.allegro.tech.hermes.common.kafka.KafkaTopicName;
 import pl.allegro.tech.hermes.common.kafka.offset.PartitionOffset;
+import pl.allegro.tech.hermes.tracker.consumers.BatchMessageMetadata;
 
 import java.nio.BufferOverflowException;
 import java.nio.ByteBuffer;
 import java.time.Clock;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import static com.google.common.base.Preconditions.checkState;
 
@@ -20,7 +24,7 @@ public class JsonMessageBatch implements MessageBatch {
 
     private final String id;
     private final ByteBuffer byteBuffer;
-    private final List<PartitionOffset> partitionOffsets = new ArrayList<>();
+    private final List<BatchMessageMetadata> messageMetadatas = new ArrayList<>();
 
     private int elements = 0;
     private long batchStart;
@@ -47,13 +51,13 @@ public class JsonMessageBatch implements MessageBatch {
     }
 
     @Override
-    public void append(byte[] data, PartitionOffset offset) {
+    public void append(byte[] data, BatchMessageMetadata batchMessageMetadata) {
         checkState(!closed, "Batch already closed.");
         if (!canFit(data)) throw new BufferOverflowException();
         if (elements == 0) batchStart = clock.millis();
 
-        byteBuffer.put((byte)(elements == 0? '[' : ',')).put(data);
-        partitionOffsets.add(offset);
+        byteBuffer.put((byte) (elements == 0 ? '[' : ',')).put(data);
+        messageMetadatas.add(batchMessageMetadata);
         elements++;
     }
 
@@ -94,7 +98,14 @@ public class JsonMessageBatch implements MessageBatch {
 
     @Override
     public List<PartitionOffset> getPartitionOffsets() {
-        return partitionOffsets;
+        return messageMetadatas.stream()
+                .map(m -> new PartitionOffset(KafkaTopicName.valueOf(m.getTopic()), m.getOffset(), m.getPartition()))
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public List<BatchMessageMetadata> getMessagesMetadata() {
+        return Collections.unmodifiableList(messageMetadatas);
     }
 
     @Override

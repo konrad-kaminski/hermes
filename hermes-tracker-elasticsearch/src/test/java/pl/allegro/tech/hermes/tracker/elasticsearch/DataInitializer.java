@@ -4,6 +4,7 @@ import org.elasticsearch.client.Client;
 import org.elasticsearch.common.xcontent.XContentBuilder;
 import pl.allegro.tech.hermes.api.PublishedMessageTraceStatus;
 import pl.allegro.tech.hermes.api.SentMessageTraceStatus;
+import pl.allegro.tech.hermes.tracker.consumers.BatchMessageMetadata;
 import pl.allegro.tech.hermes.tracker.consumers.MessageMetadata;
 import pl.allegro.tech.hermes.tracker.elasticsearch.consumers.ConsumersIndexFactory;
 import pl.allegro.tech.hermes.tracker.elasticsearch.frontend.FrontendIndexFactory;
@@ -48,6 +49,7 @@ public class DataInitializer implements LogSchemaAware {
         XContentBuilder content = jsonBuilder()
                 .startObject()
                 .field(MESSAGE_ID, messageMetadata.getId())
+                .field(BATCH_ID, messageMetadata instanceof BatchMessageMetadata ? ((BatchMessageMetadata) messageMetadata).getBatchId() : "")
                 .field(TIMESTAMP, timestamp)
                 .field(PUBLISH_TIMESTAMP, messageMetadata.getPublishingTimestamp())
                 .field(TOPIC_NAME, messageMetadata.getTopic())

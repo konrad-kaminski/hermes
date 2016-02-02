@@ -7,6 +7,7 @@ import org.elasticsearch.common.xcontent.XContentBuilder;
 import pl.allegro.tech.hermes.api.SentMessageTraceStatus;
 import pl.allegro.tech.hermes.metrics.PathsCompiler;
 import pl.allegro.tech.hermes.tracker.BatchingLogRepository;
+import pl.allegro.tech.hermes.tracker.consumers.BatchMessageMetadata;
 import pl.allegro.tech.hermes.tracker.consumers.LogRepository;
 import pl.allegro.tech.hermes.tracker.consumers.MessageMetadata;
 import pl.allegro.tech.hermes.tracker.elasticsearch.*;
@@ -70,6 +71,7 @@ public class ConsumersElasticsearchLogRepository extends BatchingLogRepository<E
         return jsonBuilder(new BytesStreamOutput(DOCUMENT_EXPECTED_SIZE))
                 .startObject()
                 .field(MESSAGE_ID, message.getId())
+                .field(BATCH_ID, message instanceof BatchMessageMetadata ? ((BatchMessageMetadata) message).getBatchId() : "")
                 .field(TIMESTAMP, timestamp)
                 .field(PUBLISH_TIMESTAMP, message.getPublishingTimestamp())
                 .field(TOPIC_NAME, message.getTopic())
