@@ -2,7 +2,6 @@ package pl.allegro.tech.hermes.consumers.consumer;
 
 import com.codahale.metrics.Timer;
 import com.github.rholder.retry.Attempt;
-import com.github.rholder.retry.RetryException;
 import com.github.rholder.retry.RetryListener;
 import com.github.rholder.retry.Retryer;
 import com.github.rholder.retry.RetryerBuilder;
@@ -26,9 +25,7 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutionException;
 
-import static com.github.rholder.retry.WaitStrategies.fibonacciWait;
 import static com.github.rholder.retry.WaitStrategies.fixedWait;
 import static java.lang.String.format;
 import static java.util.Optional.of;
@@ -107,8 +104,7 @@ public class BatchConsumer implements Consumer {
 
     private void deliver(MessageBatch batch, Retryer<MessageSendingResult> retryer) {
         try (Timer.Context timer = hermesMetrics.subscriptionLatencyTimer(subscription).time()) {
-//            MessageSendingResult result = retryer.call(() -> sender.send(batch, subscription.getEndpoint()));
-            MessageSendingResult result = sender.send(batch, subscription.getEndpoint());
+            MessageSendingResult result = retryer.call(() -> sender.send(batch, subscription.getEndpoint()));
             ecosystem.markSendingResult(batch, subscription, result);
         } catch (Exception e) {
             logger.error(format("[batch_id=%s, subscription=%s] Batch was rejected.", batch.getId(), subscription.toSubscriptionName()), e);
