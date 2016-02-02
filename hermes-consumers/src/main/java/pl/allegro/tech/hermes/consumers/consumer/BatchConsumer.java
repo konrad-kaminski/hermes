@@ -29,6 +29,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 
 import static com.github.rholder.retry.WaitStrategies.fibonacciWait;
+import static com.github.rholder.retry.WaitStrategies.fixedWait;
 import static java.lang.String.format;
 import static java.util.Optional.of;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
@@ -98,7 +99,7 @@ public class BatchConsumer implements Consumer {
                 .retryIfExceptionOfType(IOException.class)
                 .retryIfRuntimeException()
                 .retryIfResult(result -> isConsuming() && !result.succeeded() && (!result.isClientError() || retryClientErrors))
-                .withWaitStrategy(fibonacciWait(1, 200, MILLISECONDS))
+                .withWaitStrategy(fixedWait(messageBackoff, MILLISECONDS))
                 .withStopStrategy(attempt -> attempt.getDelaySinceFirstAttempt() > messageTtl)
                 .withRetryListener(getRetryListener(result -> ecosystem.markFailed(batch, subscription, result)))
                 .build();
