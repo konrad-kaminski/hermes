@@ -4,7 +4,6 @@ import org.elasticsearch.client.Client;
 import org.elasticsearch.common.xcontent.XContentBuilder;
 import pl.allegro.tech.hermes.api.PublishedMessageTraceStatus;
 import pl.allegro.tech.hermes.api.SentMessageTraceStatus;
-import pl.allegro.tech.hermes.tracker.consumers.BatchMessageMetadata;
 import pl.allegro.tech.hermes.tracker.consumers.MessageMetadata;
 import pl.allegro.tech.hermes.tracker.elasticsearch.consumers.ConsumersIndexFactory;
 import pl.allegro.tech.hermes.tracker.elasticsearch.frontend.FrontendIndexFactory;
@@ -33,7 +32,7 @@ public class DataInitializer implements LogSchemaAware {
     public void indexPublishedMessage(MessageMetadata messageMetadata, long timestamp, PublishedMessageTraceStatus status) throws IOException {
         XContentBuilder publishedContent = jsonBuilder()
                 .startObject()
-                .field(MESSAGE_ID, messageMetadata.getId())
+                .field(MESSAGE_ID, messageMetadata.getMessageId())
                 .field(TIMESTAMP, timestamp)
                 .field(STATUS, status)
                 .field(TOPIC_NAME, messageMetadata.getTopic())
@@ -48,8 +47,8 @@ public class DataInitializer implements LogSchemaAware {
     public void indexSentMessage(MessageMetadata messageMetadata, long timestamp, SentMessageTraceStatus status, String reason) throws IOException {
         XContentBuilder content = jsonBuilder()
                 .startObject()
-                .field(MESSAGE_ID, messageMetadata.getId())
-                .field(BATCH_ID, messageMetadata instanceof BatchMessageMetadata ? ((BatchMessageMetadata) messageMetadata).getBatchId() : "")
+                .field(MESSAGE_ID, messageMetadata.getMessageId())
+                .field(BATCH_ID, messageMetadata.getBatchId())
                 .field(TIMESTAMP, timestamp)
                 .field(PUBLISH_TIMESTAMP, messageMetadata.getPublishingTimestamp())
                 .field(TOPIC_NAME, messageMetadata.getTopic())
