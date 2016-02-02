@@ -98,7 +98,7 @@ public class BatchConsumer implements Consumer {
                 .retryIfExceptionOfType(IOException.class)
                 .retryIfRuntimeException()
                 .retryIfResult(result -> isConsuming() && !result.succeeded() && (!result.isClientError() || retryClientErrors))
-                .withWaitStrategy(fibonacciWait(1, messageTtl, MILLISECONDS))
+                .withWaitStrategy(fibonacciWait(1, 200, MILLISECONDS))
                 .withStopStrategy(attempt -> attempt.getDelaySinceFirstAttempt() > messageTtl)
                 .withRetryListener(getRetryListener(result -> ecosystem.markFailed(batch, subscription, result)))
                 .build();
