@@ -71,12 +71,16 @@ public class BatchConsumer implements Consumer {
         while (isConsuming()) {
             Optional<MessageBatch> inflight = Optional.empty();
             try {
+                logger.info("Trying to create new batch for subscription {}", subscription.getId());
                 inflight = of(receiver.next(subscription));
                 inflight.ifPresent(batch -> {
+                    logger.info("Delivering batch for subscription {}", subscription.getId());
                     deliver(batch, createRetryer(batch, subscription.getSubscriptionPolicy()));
+                    logger.info("Finished delivering batch for subscription {}", subscription.getId());
                     offsets.putAllDelivered(batch.getPartitionOffsets());
                 });
             } finally {
+                logger.info("Cleaning batch for subscription {}", subscription.getId());
                 inflight.ifPresent(this::clean);
             }
         }
@@ -94,7 +98,7 @@ public class BatchConsumer implements Consumer {
                 .retryIfExceptionOfType(IOException.class)
                 .retryIfRuntimeException()
                 .retryIfResult(result -> isConsuming() && !result.succeeded() && (!result.isClientError() || retryClientErrors))
-                .withWaitStrategy(fibonacciWait(10, messageTtl, MILLISECONDS))
+                .withWaitStrategy(fibonacciWait(1, messageTtl, MILLISECONDS))
                 .withStopStrategy(attempt -> attempt.getDelaySinceFirstAttempt() > messageTtl)
                 .withRetryListener(getRetryListener(result -> ecosystem.markFailed(batch, subscription, result)))
                 .build();
