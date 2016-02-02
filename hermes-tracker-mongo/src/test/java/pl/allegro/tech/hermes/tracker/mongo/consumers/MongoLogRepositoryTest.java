@@ -63,6 +63,7 @@ public class MongoLogRepositoryTest extends AbstractLogRepositoryTest implements
         BasicDBObject object = (BasicDBObject) rawObject;
         return new SentMessageTrace(
                 object.getString(MESSAGE_ID),
+                object.getString(BATCH_ID),
                 object.getLong(TIMESTAMP),
                 object.getString(LogSchemaAware.SUBSCRIPTION),
                 object.getString(TOPIC_NAME),

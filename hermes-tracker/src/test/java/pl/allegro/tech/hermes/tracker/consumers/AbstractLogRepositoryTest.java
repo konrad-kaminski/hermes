@@ -79,7 +79,7 @@ public abstract class AbstractLogRepositoryTest {
         // given
         String messageId = "messageId";
         String batchId = "batchId";
-        String topic = "group.sentMessage";
+        String topic = "group.sentBatchMessage";
 
         // when
         logRepository.logSuccessful(TestMessageMetadata.of(messageId, batchId, topic, SUBSCRIPTION), 1234L);
