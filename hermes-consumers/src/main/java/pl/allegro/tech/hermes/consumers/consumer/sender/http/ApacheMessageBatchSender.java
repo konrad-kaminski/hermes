@@ -30,9 +30,10 @@ public class ApacheMessageBatchSender implements MessageBatchSender {
 
     @Override
     public MessageSendingResult send(MessageBatch batch, EndpointAddress address) {
+        HttpPost httpPost = null;
         try {
             ContentType contentType = getMediaType(batch.getContentType());
-            HttpPost httpPost = new HttpPost(address.getEndpoint());
+            httpPost = new HttpPost(address.getEndpoint());
             ByteBufferEntity entity = new ByteBufferEntity(batch.getContent(), contentType);
             httpPost.setConfig(requestConfig);
             httpPost.setEntity(entity);
@@ -44,6 +45,8 @@ public class ApacheMessageBatchSender implements MessageBatchSender {
             return new MessageSendingResult(response.getStatusLine().getStatusCode());
         } catch (IOException e) {
             return new MessageSendingResult(e);
+        } finally {
+            if (httpPost != null) httpPost.releaseConnection();
         }
     }
 
