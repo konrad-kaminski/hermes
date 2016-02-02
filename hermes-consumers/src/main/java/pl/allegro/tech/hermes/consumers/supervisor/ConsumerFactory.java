@@ -57,7 +57,8 @@ public class ConsumerFactory {
                            Clock clock,
                            TopicRepository topicRepository,
                            MessageConverterResolver messageConverterResolver,
-                           MessageBatchWrapper messageBatchWrapper) {
+                           MessageBatchWrapper messageBatchWrapper,
+                           MessageBatchFactory byteBufferMessageBatchFactory) {
 
         this.messageReceiverFactory = messageReceiverFactory;
         this.hermesMetrics = hermesMetrics;
@@ -70,7 +71,7 @@ public class ConsumerFactory {
         this.topicRepository = topicRepository;
         this.messageConverterResolver = messageConverterResolver;
         this.messageBatchWrapper = messageBatchWrapper;
-        this.batchFactory = new ByteBufferMessageBatchFactory(1024, 64*1024, clock, hermesMetrics);
+        this.batchFactory = byteBufferMessageBatchFactory;
     }
 
     Consumer createConsumer(Subscription subscription) {

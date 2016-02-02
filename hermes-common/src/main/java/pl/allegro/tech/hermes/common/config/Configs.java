@@ -117,6 +117,8 @@ public enum Configs {
     CONSUMER_WORKLOAD_MAX_SUBSCRIPTIONS_PER_CONSUMER("consumer.workload.max.subscriptions.per.consumer", 200),
     CONSUMER_WORKLOAD_NODE_ID("consumer.workload.node.id",
             new InetAddressHostnameResolver().resolve().replaceAll("\\.", "_") + "$" + abs(randomUUID().getMostSignificantBits())),
+    CONSUMER_BATCH_POOLABLE_SIZE("consumer.batch.poolable.size", 1024),
+    CONSUMER_BATCH_MAX_POOL_SIZE("consumer.batch.max.pool.size", 64*1024),
 
     GRAPHITE_HOST("graphite.host", "localhost"),
     GRAPHITE_PORT("graphite.port", 2003),
