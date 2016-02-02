@@ -29,7 +29,7 @@ public interface MessageBatch {
 
     int size();
 
-    long startTime();
-
     List<MessageMetadata> getMessagesMetadata();
+
+    long getLifetime();
 }

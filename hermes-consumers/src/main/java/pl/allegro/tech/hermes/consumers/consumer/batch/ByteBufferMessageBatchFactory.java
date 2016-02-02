@@ -8,6 +8,7 @@ import java.nio.ByteBuffer;
 import java.time.Clock;
 import java.util.UUID;
 
+import static com.google.common.base.Preconditions.checkNotNull;
 import static java.lang.String.format;
 
 public class ByteBufferMessageBatchFactory implements MessageBatchFactory {
@@ -42,6 +43,7 @@ public class ByteBufferMessageBatchFactory implements MessageBatchFactory {
 
     @Override
     public void destroyBatch(MessageBatch batch) {
+        checkNotNull(batch);
         bufferPool.deallocate(batch.getContent());
     }
 }
