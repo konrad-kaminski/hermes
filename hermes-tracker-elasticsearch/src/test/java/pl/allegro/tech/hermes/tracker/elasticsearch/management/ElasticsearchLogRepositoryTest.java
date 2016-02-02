@@ -119,6 +119,7 @@ public class ElasticsearchLogRepositoryTest implements LogSchemaAware {
 
     private SentMessageTrace sentMessageTrace(MessageMetadata messageMetadata, long timestamp, SentMessageTraceStatus status) {
         return new SentMessageTrace(messageMetadata.getMessageId(),
+                messageMetadata.getBatchId(),
                 timestamp,
                 messageMetadata.getSubscription(),
                 messageMetadata.getTopic(),
