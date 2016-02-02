@@ -38,7 +38,7 @@ allprojects {
     apply plugin: 'jacoco'
 
     group = 'pl.allegro.tech.hermes'
-    version = '0.8.3-batch-delivery-demo-6-SNAPSHOT'
+    version = '0.8.3-batch-delivery-demo-7-SNAPSHOT'
 
     sourceCompatibility = 1.8
     targetCompatibility = 1.8
