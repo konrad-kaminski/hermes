@@ -42,7 +42,6 @@ public class BatchConsumer implements Consumer {
     private final CountDownLatch stoppedLatch = new CountDownLatch(1);
     private final MessageBatchReceiver receiver;
     private final HermesMetrics hermesMetrics;
-    private final Trackers trackers;
 
     private Subscription subscription;
     boolean consuming = true;
@@ -57,7 +56,6 @@ public class BatchConsumer implements Consumer {
                          HermesMetrics hermesMetrics,
                          Trackers trackers,
                          Subscription subscription) {
-        this.trackers = trackers;
         this.receiver = new MessageBatchReceiver(receiver, batchFactory, messageBatchWrapper, hermesMetrics, trackers);
         this.sender = sender;
         this.batchFactory = batchFactory;
@@ -96,7 +94,7 @@ public class BatchConsumer implements Consumer {
                 .retryIfExceptionOfType(IOException.class)
                 .retryIfRuntimeException()
                 .retryIfResult(result -> isConsuming() && !result.succeeded() && (!result.isClientError() || retryClientErrors))
-                .withWaitStrategy(fibonacciWait(messageBackoff, messageTtl, MILLISECONDS))
+                .withWaitStrategy(fibonacciWait(10, messageTtl, MILLISECONDS))
                 .withStopStrategy(attempt -> attempt.getDelaySinceFirstAttempt() > messageTtl)
                 .withRetryListener(getRetryListener(result -> ecosystem.markFailed(batch, subscription, result)))
                 .build();
