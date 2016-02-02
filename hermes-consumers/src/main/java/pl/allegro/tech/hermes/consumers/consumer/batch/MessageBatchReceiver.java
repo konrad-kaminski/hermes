@@ -6,7 +6,7 @@ import pl.allegro.tech.hermes.consumers.consumer.Message;
 import pl.allegro.tech.hermes.consumers.consumer.MessageBatchWrapper;
 import pl.allegro.tech.hermes.consumers.consumer.receiver.MessageReceiver;
 import pl.allegro.tech.hermes.consumers.consumer.receiver.MessageReceivingTimeoutException;
-import pl.allegro.tech.hermes.tracker.consumers.BatchMessageMetadata;
+import pl.allegro.tech.hermes.tracker.consumers.MessageMetadata;
 import pl.allegro.tech.hermes.tracker.consumers.Trackers;
 
 import java.util.ArrayDeque;
@@ -60,8 +60,8 @@ public class MessageBatchReceiver {
         return next;
     }
 
-    private BatchMessageMetadata messageMetadata(Subscription subscription, String batchId, Message next) {
-        return new BatchMessageMetadata(next.getId(), batchId, next.getOffset(), next.getPartition(), subscription.getQualifiedTopicName(), subscription.getName(), next.getPublishingTimestamp(), next.getReadingTimestamp());
+    private MessageMetadata messageMetadata(Subscription subscription, String batchId, Message next) {
+        return new MessageMetadata(next.getId(), batchId, next.getOffset(), next.getPartition(), subscription.getQualifiedTopicName(), subscription.getName(), next.getPublishingTimestamp(), next.getReadingTimestamp());
     }
 
     private boolean isReceiving() {

@@ -44,6 +44,7 @@ public class ConsumerFactory {
     private final TopicRepository topicRepository;
     private final MessageConverterResolver messageConverterResolver;
     private final MessageBatchWrapper messageBatchWrapper;
+    private final MessageBatchFactory batchFactory;
 
     @Inject
     public ConsumerFactory(ReceiverFactory messageReceiverFactory,
@@ -69,6 +70,7 @@ public class ConsumerFactory {
         this.topicRepository = topicRepository;
         this.messageConverterResolver = messageConverterResolver;
         this.messageBatchWrapper = messageBatchWrapper;
+        this.batchFactory = new ByteBufferMessageBatchFactory(1024, 64*1024, clock, hermesMetrics);
     }
 
     Consumer createConsumer(Subscription subscription) {
@@ -86,7 +88,6 @@ public class ConsumerFactory {
 
         if (DeliveryType.BATCH == subscription.getSubscriptionPolicy().getDeliveryType()) {
             MessageBatchSender sender = new ApacheMessageBatchSender();
-            MessageBatchFactory batchFactory = new ByteBufferMessageBatchFactory(1024, 64*1024, clock, hermesMetrics);
             return new BatchConsumer(messageReceiver,
                     sender,
                     batchFactory,

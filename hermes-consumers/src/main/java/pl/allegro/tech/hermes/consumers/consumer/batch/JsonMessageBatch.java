@@ -4,7 +4,7 @@ import pl.allegro.tech.hermes.api.ContentType;
 import pl.allegro.tech.hermes.api.Subscription;
 import pl.allegro.tech.hermes.common.kafka.KafkaTopicName;
 import pl.allegro.tech.hermes.common.kafka.offset.PartitionOffset;
-import pl.allegro.tech.hermes.tracker.consumers.BatchMessageMetadata;
+import pl.allegro.tech.hermes.tracker.consumers.MessageMetadata;
 
 import java.nio.BufferOverflowException;
 import java.nio.ByteBuffer;
@@ -24,7 +24,7 @@ public class JsonMessageBatch implements MessageBatch {
 
     private final String id;
     private final ByteBuffer byteBuffer;
-    private final List<BatchMessageMetadata> messageMetadatas = new ArrayList<>();
+    private final List<MessageMetadata> messageMetadatas = new ArrayList<>();
 
     private int elements = 0;
     private long batchStart;
@@ -51,13 +51,13 @@ public class JsonMessageBatch implements MessageBatch {
     }
 
     @Override
-    public void append(byte[] data, BatchMessageMetadata batchMessageMetadata) {
+    public void append(byte[] data, MessageMetadata MessageMetadata) {
         checkState(!closed, "Batch already closed.");
         if (!canFit(data)) throw new BufferOverflowException();
         if (elements == 0) batchStart = clock.millis();
 
         byteBuffer.put((byte) (elements == 0 ? '[' : ',')).put(data);
-        messageMetadatas.add(batchMessageMetadata);
+        messageMetadatas.add(MessageMetadata);
         elements++;
     }
 
@@ -104,7 +104,7 @@ public class JsonMessageBatch implements MessageBatch {
     }
 
     @Override
-    public List<BatchMessageMetadata> getMessagesMetadata() {
+    public List<MessageMetadata> getMessagesMetadata() {
         return Collections.unmodifiableList(messageMetadatas);
     }
 
