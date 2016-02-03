@@ -93,6 +93,9 @@ public class JsonMessageBatch implements MessageBatch {
 
     @Override
     public ByteBuffer getContent() {
+        if (closed) {
+            byteBuffer.position(0);
+        }
         return byteBuffer;
     }
 

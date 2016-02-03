@@ -5,6 +5,7 @@ import pl.allegro.tech.hermes.api.DeliveryType;
 import pl.allegro.tech.hermes.api.Subscription;
 import pl.allegro.tech.hermes.api.Topic;
 import pl.allegro.tech.hermes.common.config.ConfigFactory;
+import pl.allegro.tech.hermes.common.config.Configs;
 import pl.allegro.tech.hermes.common.metric.HermesMetrics;
 import pl.allegro.tech.hermes.consumers.consumer.BatchConsumer;
 import pl.allegro.tech.hermes.consumers.consumer.Consumer;
@@ -88,7 +89,10 @@ public class ConsumerFactory {
         MessageReceiver messageReceiver = messageReceiverFactory.createMessageReceiver(topic, subscription);
 
         if (DeliveryType.BATCH == subscription.getSubscriptionPolicy().getDeliveryType()) {
-            MessageBatchSender sender = new ApacheMessageBatchSender();
+            MessageBatchSender sender = new ApacheMessageBatchSender(
+                    configFactory.getIntProperty(Configs.CONSUMER_BATCH_CONNECTION_TIMEOUT),
+                    configFactory.getIntProperty(Configs.CONSUMER_BATCH_SOCKET_TIMEOUT));
+
             return new BatchConsumer(messageReceiver,
                     sender,
                     batchFactory,

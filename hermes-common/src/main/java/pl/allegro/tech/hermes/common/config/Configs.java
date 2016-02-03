@@ -119,6 +119,8 @@ public enum Configs {
             new InetAddressHostnameResolver().resolve().replaceAll("\\.", "_") + "$" + abs(randomUUID().getMostSignificantBits())),
     CONSUMER_BATCH_POOLABLE_SIZE("consumer.batch.poolable.size", 1024),
     CONSUMER_BATCH_MAX_POOL_SIZE("consumer.batch.max.pool.size", 64*1024),
+    CONSUMER_BATCH_CONNECTION_TIMEOUT("consumer.batch.connection.timeout", 500),
+    CONSUMER_BATCH_SOCKET_TIMEOUT("consumer.batch.socket.timeout", 500),
 
     GRAPHITE_HOST("graphite.host", "localhost"),
     GRAPHITE_PORT("graphite.port", 2003),

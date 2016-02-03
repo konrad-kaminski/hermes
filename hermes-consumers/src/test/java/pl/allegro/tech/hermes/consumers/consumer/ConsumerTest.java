@@ -179,7 +179,14 @@ public class ConsumerTest {
     public void shouldUpdateSubscriptionPolicy() {
         // given
         Subscription newSubscription = createSubscription();
-        SubscriptionPolicy newSubscriptionPolicy = new SubscriptionPolicy(2, 500, false, 10, DeliveryType.SERIAL, 1, 1, 1);
+        SubscriptionPolicy newSubscriptionPolicy = subscriptionPolicy()
+                .withRate(2)
+                .withMessageTtl(500)
+                .withMessageBackoff(10)
+                .withBatchSize(1)
+                .withBatchTime(1)
+                .withBatchVolume(1)
+                .build();
         newSubscription.setSubscriptionPolicy(newSubscriptionPolicy);
 
         // when

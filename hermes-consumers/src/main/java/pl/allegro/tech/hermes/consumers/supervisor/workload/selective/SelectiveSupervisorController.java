@@ -62,6 +62,11 @@ public class SelectiveSupervisorController implements SupervisorController {
     }
 
     @Override
+    public void onSubscriptionChanged(Subscription subscription) {
+        supervisor.updateSubscription(subscription);
+    }
+
+    @Override
     public void start() throws Exception {
         adminCache.start();
         adminCache.addCallback(this);
@@ -112,4 +117,6 @@ public class SelectiveSupervisorController implements SupervisorController {
             supervisor.restartConsumer(subscription);
         }
     }
+
+
 }

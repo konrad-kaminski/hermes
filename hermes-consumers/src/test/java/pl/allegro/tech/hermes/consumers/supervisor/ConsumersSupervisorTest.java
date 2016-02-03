@@ -228,7 +228,17 @@ public class ConsumersSupervisorTest {
         // given
         final Subscription oldSubscription = createSubscription(SOME_TOPIC_NAME, SOME_SUBSCRIPTION_NAME);
         Subscription newSubscription = createSubscription(SOME_TOPIC_NAME, SOME_SUBSCRIPTION_NAME);
-        newSubscription.setSubscriptionPolicy(new SubscriptionPolicy(2, 1000, false, 10, DeliveryType.SERIAL, 1, 1, 1));
+        SubscriptionPolicy policy = subscriptionPolicy()
+                .withRate(2)
+                .withMessageTtl(1000)
+                .withMessageBackoff(10)
+                .withBatchSize(1)
+                .withBatchTime(1)
+                .withBatchVolume(1)
+                .build();
+
+        newSubscription.setSubscriptionPolicy(policy);
+
         newSubscription.setState(Subscription.State.ACTIVE);
 
         when(consumer.getSubscription()).thenReturn(oldSubscription);

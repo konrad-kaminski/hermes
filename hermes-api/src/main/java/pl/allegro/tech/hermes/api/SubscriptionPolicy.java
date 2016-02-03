@@ -9,6 +9,7 @@ import java.util.Objects;
 
 public class SubscriptionPolicy {
     private static final Integer DEFAULT_MESSAGE_BACKOFF = 100;
+    private static final Integer DEFAULT_REQUEST_TIMEOUT = 1000;
 
     @Min(1)
     private Integer rate;
@@ -27,6 +28,7 @@ public class SubscriptionPolicy {
     private Integer batchSize;
     private Integer batchTime;
     private Integer batchVolume;
+    private int requestTimeout;
 
     private SubscriptionPolicy() { }
 
@@ -34,6 +36,7 @@ public class SubscriptionPolicy {
     public SubscriptionPolicy(@JsonProperty("rate") int rate, @JsonProperty("messageTtl") int messageTtl,
                               @JsonProperty("retryClientErrors") boolean retryClientErrors,
                               @JsonProperty("messageBackoff") Integer messageBackoff,
+                              @JsonProperty("requestTimeout") Integer requestTimeout,
                               @JsonProperty("deliveryType") DeliveryType deliveryType,
                               @JsonProperty("batchSize") Integer batchSize,
                               @JsonProperty("batchTime") Integer batchTime,
@@ -42,6 +45,7 @@ public class SubscriptionPolicy {
         this.messageTtl = messageTtl;
         this.retryClientErrors = retryClientErrors;
         this.messageBackoff = messageBackoff != null ? messageBackoff : DEFAULT_MESSAGE_BACKOFF;
+        this.requestTimeout = requestTimeout != null ? requestTimeout : DEFAULT_REQUEST_TIMEOUT;
         this.deliveryType = deliveryType != null ? deliveryType : DeliveryType.SERIAL;
         this.batchSize = batchSize;
         this.batchTime = batchTime;
@@ -65,6 +69,7 @@ public class SubscriptionPolicy {
         return Objects.equals(this.rate, other.rate)
                 && Objects.equals(this.messageTtl, other.messageTtl)
                 && Objects.equals(this.messageBackoff, other.messageBackoff)
+                && Objects.equals(this.requestTimeout, other.requestTimeout)
                 && Objects.equals(this.retryClientErrors, other.retryClientErrors)
                 && Objects.equals(this.deliveryType, other.deliveryType)
                 && Objects.equals(this.batchSize, other.batchSize)
@@ -78,6 +83,7 @@ public class SubscriptionPolicy {
                 .add("rate", rate)
                 .add("messageTtl", messageTtl)
                 .add("messageBackoff", messageBackoff)
+                .add("requestTimeout", requestTimeout)
                 .add("retryClientErrors", retryClientErrors)
                 .add("deliveryType", deliveryType)
                 .add("batchSize", batchSize)
@@ -125,6 +131,10 @@ public class SubscriptionPolicy {
         return batchVolume;
     }
 
+    public int getRequestTimeout() {
+        return requestTimeout;
+    }
+
     public static class Builder {
         private static final Integer DEFAULT_RATE = 400;
         private static final Integer DEFAULT_MESSAGE_TTL = 3600;
@@ -139,6 +149,7 @@ public class SubscriptionPolicy {
             subscriptionPolicy.rate = DEFAULT_RATE;
             subscriptionPolicy.messageTtl = DEFAULT_MESSAGE_TTL;
             subscriptionPolicy.messageBackoff = DEFAULT_MESSAGE_BACKOFF;
+            subscriptionPolicy.requestTimeout = DEFAULT_REQUEST_TIMEOUT;
             subscriptionPolicy.deliveryType = DeliveryType.SERIAL;
             return this;
         }
@@ -180,6 +191,11 @@ public class SubscriptionPolicy {
 
         public Builder withBatchVolume(int volume) {
             subscriptionPolicy.batchVolume = volume;
+            return this;
+        }
+
+        public Builder withRequestTimeout(int requestTimeout) {
+            subscriptionPolicy.requestTimeout = requestTimeout;
             return this;
         }
 
