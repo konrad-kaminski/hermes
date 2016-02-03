@@ -171,6 +171,26 @@ public class PublishingTest extends IntegrationTest {
         interpolatedEndpoint.waitUntilReceived();
     }
 
+//TODO use verified server
+//    @Test
+    public void shouldPublishMessageToSecuredSubscriber() throws InterruptedException {
+        // given
+        Topic topic = operations.buildTopic("publishSecuredGroup", "topic");
+        operations.createSubscription(topic, "subscription", "https://securedServer");
+
+        // when
+        publisher.publish(topic.getQualifiedName(), "[{\"name\": \"stash.client.nav.repositories.opened\", \"properties\": {}, \"timeDelta\": -2869}]");
+
+        // then
+        //TODO check metric to verify if message has been delivered
+    }
+
+//TODO write or use some external self signed server as a subscriber
+//    @Test
+//    public void shouldNotPublishedToSelfSignedSubscriber() {
+//
+//    }
+
     @Unreliable
     @Test(enabled = false)
     public void shouldTreatMessageWithInvalidInterpolationAsUndelivered() {
