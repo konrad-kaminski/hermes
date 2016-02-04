@@ -1,37 +1,43 @@
 package pl.allegro.tech.hermes.integration;
 
 import com.github.tomakehurst.wiremock.WireMockServer;
-import com.github.tomakehurst.wiremock.client.RequestPatternBuilder;
 import com.github.tomakehurst.wiremock.client.UrlMatchingStrategy;
 import com.github.tomakehurst.wiremock.client.WireMock;
-import com.github.tomakehurst.wiremock.http.RequestMethod;
 import com.github.tomakehurst.wiremock.stubbing.Scenario;
 import com.github.tomakehurst.wiremock.verification.LoggedRequest;
 import com.jayway.awaitility.Awaitility;
+import com.jayway.awaitility.Duration;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
+import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 import pl.allegro.tech.hermes.api.Topic;
 import pl.allegro.tech.hermes.test.helper.message.TestMessage;
 import pl.allegro.tech.hermes.test.helper.util.Ports;
 
 import java.util.List;
+import java.util.stream.IntStream;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
 import static com.github.tomakehurst.wiremock.client.WireMock.containing;
 import static com.github.tomakehurst.wiremock.client.WireMock.findAll;
 import static com.github.tomakehurst.wiremock.client.WireMock.post;
+import static com.github.tomakehurst.wiremock.client.WireMock.postRequestedFor;
 import static com.github.tomakehurst.wiremock.client.WireMock.resetAllScenarios;
 import static com.github.tomakehurst.wiremock.client.WireMock.stubFor;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlEqualTo;
-import static java.util.Arrays.stream;
+import static com.github.tomakehurst.wiremock.client.WireMock.urlMatching;
 import static javax.ws.rs.core.Response.Status.CREATED;
 import static pl.allegro.tech.hermes.integration.test.HermesAssertions.assertThat;
 
 public class BatchRetryPolicyTest extends IntegrationTest {
 
-    private static final TestMessage[] SMALL_BATCH = TestMessage.simpleMessages(1);
     private WireMockServer wireMockRule;
+
+    @BeforeMethod
+    public void beforeMethod() {
+        resetAllScenarios();
+    }
 
     @BeforeClass
     public void beforeClass() {
@@ -50,32 +56,29 @@ public class BatchRetryPolicyTest extends IntegrationTest {
         //given
         String topicName = "retryUntilRequestSuccessful";
         Topic topic = operations.buildTopic(topicName, "topic");
-        operations.createBatchSubscription(topic, "http://localhost:" + wireMockRule.port() + "/" + topicName, 100, 1, 1, 100);
+        createSingleMessageBatchSubscription(topic);
 
-        stubFor(post(urlEqualTo("/" + topicName))
+        stubFor(post(topicUrl(topicName))
                 .inScenario(topicName)
                 .whenScenarioStateIs(Scenario.STARTED)
                 .willReturn(aResponse().withStatus(500))
                 .willSetStateTo("healthy"));
 
-        stubFor(post(urlEqualTo("/" + topicName))
+        stubFor(post(topicUrl(topicName))
                 .inScenario(topicName)
                 .whenScenarioStateIs("healthy")
                 .willReturn(aResponse().withStatus(200)));
 
         //when
-        stream(SMALL_BATCH).forEach(m -> publish(topic, m));
-
-        resetAllScenarios();
+        publish(topic, TestMessage.simple());
 
         //then
-        UrlMatchingStrategy urlMatchingStrategy = new UrlMatchingStrategy();
-        urlMatchingStrategy.setUrl("/" + topicName);
-        RequestPatternBuilder requestPattern = new RequestPatternBuilder(RequestMethod.POST, urlMatchingStrategy);
-        Awaitility.await().until(() -> {
-            List<LoggedRequest> found = findAll(requestPattern);
-            assertThat(found).hasSize(2);
-        });
+        wait.until(() -> assertThat(recordedRequests(topicName)).hasSize(2));
+
+    }
+
+    private UrlMatchingStrategy topicUrl(String topicName) {
+        return urlEqualTo("/" + topicName);
     }
 
     @Test
@@ -83,24 +86,15 @@ public class BatchRetryPolicyTest extends IntegrationTest {
         //given
         String topicName = "notRetryIfRequestSuccessful";
         Topic topic = operations.buildTopic(topicName, "topic");
-        operations.createBatchSubscription(topic, "http://localhost:" + wireMockRule.port() + "/" + topicName, 100, 1, 1, 100);
+        createSingleMessageBatchSubscription(topic);
 
-        stubFor(post(urlEqualTo("/" + topicName))
-                .willReturn(aResponse().withStatus(200)));
+        stubFor(post(topicUrl(topicName)).willReturn(aResponse().withStatus(200)));
 
         //when
-        stream(SMALL_BATCH).forEach(m -> publish(topic, m));
-
-        resetAllScenarios();
+        publish(topic, TestMessage.simple());
 
         //then
-        UrlMatchingStrategy urlMatchingStrategy = new UrlMatchingStrategy();
-        urlMatchingStrategy.setUrl("/" + topicName);
-        RequestPatternBuilder requestPattern = new RequestPatternBuilder(RequestMethod.POST, urlMatchingStrategy);
-        Awaitility.await().until(() -> {
-            List<LoggedRequest> found = findAll(requestPattern);
-            assertThat(found).hasSize(1);
-        });
+        wait.until(() -> assertThat(recordedRequests(topicName)).hasSize(1));
     }
 
     @Test
@@ -108,35 +102,31 @@ public class BatchRetryPolicyTest extends IntegrationTest {
         //given
         String topicName = "retryUntilTtlExciteed";
         Topic topic = operations.buildTopic(topicName, "topic");
-        operations.createBatchSubscription(topic, "http://localhost:" + wireMockRule.port() + "/" + topicName, 100, 20, 1, 1, 100, false);
+        createSingleMessageBatchSubscription(topic, 110, 20);
 
-        stubFor(post(urlEqualTo("/" + topicName))
-                .withRequestBody(containing("damian"))
+        String failedRequestBody = "failed";
+        String successfulRequestBody = "successful";
+
+        stubFor(post(topicUrl(topicName))
+                .withRequestBody(containing(failedRequestBody))
                 .willReturn(aResponse().withStatus(500)));
 
-        stubFor(post(urlEqualTo("/" + topicName))
-                .withRequestBody(containing("beata"))
+        stubFor(post(topicUrl(topicName))
+                .withRequestBody(containing(successfulRequestBody))
                 .willReturn(aResponse().withStatus(200)));
 
         //when
-        assertThat(publisher.publish(topic.getQualifiedName(), "damian")).hasStatus(CREATED);
-        assertThat(publisher.publish(topic.getQualifiedName(), "beata")).hasStatus(CREATED);
-
-        resetAllScenarios();
+        assertThat(publisher.publish(topic.getQualifiedName(), failedRequestBody)).hasStatus(CREATED);
+        Thread.sleep(500);
+        assertThat(publisher.publish(topic.getQualifiedName(), successfulRequestBody)).hasStatus(CREATED);
 
         //then
-        UrlMatchingStrategy urlMatchingStrategy = new UrlMatchingStrategy();
-        urlMatchingStrategy.setUrl("/" + topicName);
-        RequestPatternBuilder requestPattern = new RequestPatternBuilder(RequestMethod.POST, urlMatchingStrategy);
-        Awaitility.await().until(() -> {
-            List<LoggedRequest> found = findAll(requestPattern);
-            assertThat(found.size()).isEqualTo(6);
+        wait.until(() -> {
+            List<LoggedRequest> requests = recordedRequests(topicName);
 
-            for (int i = 0; i < found.size() - 2; i++) {
-                assertThat(found.get(i).getBodyAsString()).contains("damian");
-            }
-
-            assertThat(found.get(found.size() - 1).getBodyAsString()).contains("beata");
+            assertThat(requests.size()).isEqualTo(6);
+            IntStream.range(0, 4).forEach(i -> assertThat(requests.get(i).getBodyAsString()).contains(failedRequestBody));
+            assertThat(requests.get(5).getBodyAsString()).contains(successfulRequestBody);
         });
     }
 
@@ -144,71 +134,78 @@ public class BatchRetryPolicyTest extends IntegrationTest {
     public void shouldRetryOnClientErrors() throws Throwable {
         //given
         String topicName = "retryOnClientErrors";
+        boolean retryOnClientErrors = true;
         Topic topic = operations.buildTopic(topicName, "topic");
-        operations.createBatchSubscription(topic, "http://localhost:" + wireMockRule.port() + "/" + topicName, 100, 10, 1, 1, 100, true);
+        createSingleMessageBatchSubscription(topic, retryOnClientErrors);
 
-
-        stubFor(post(urlEqualTo("/" + topicName))
+        stubFor(post(topicUrl(topicName))
                 .inScenario(topicName)
                 .whenScenarioStateIs(Scenario.STARTED)
                 .willReturn(aResponse().withStatus(400))
                 .willSetStateTo("healthy"));
 
-        stubFor(post(urlEqualTo("/" + topicName))
+        stubFor(post(topicUrl(topicName))
                 .inScenario(topicName)
                 .whenScenarioStateIs("healthy")
                 .willReturn(aResponse().withStatus(200)));
 
         //when
-        stream(SMALL_BATCH).forEach(m -> publish(topic, m));
-
-        resetAllScenarios();
+        publish(topic, TestMessage.simple());
 
         //then
-        UrlMatchingStrategy urlMatchingStrategy = new UrlMatchingStrategy();
-        urlMatchingStrategy.setUrl("/" + topicName);
-        RequestPatternBuilder requestPattern = new RequestPatternBuilder(RequestMethod.POST, urlMatchingStrategy);
-        Awaitility.await().until(() -> {
-            List<LoggedRequest> found = findAll(requestPattern);
-            assertThat(found).hasSize(2);
-        });
+        wait.until(() -> assertThat(recordedRequests(topicName)).hasSize(2));
     }
+
+
 
     @Test
     public void shouldNotRetryOnClientErrors() throws Throwable {
         //given
         String topicName = "retryOnClientErrors";
         Topic topic = operations.buildTopic(topicName, "topic");
-        operations.createBatchSubscription(topic, "http://localhost:" + wireMockRule.port() + "/" + topicName, 100, 10, 1, 1, 100, false);
+        operations.createBatchSubscription(topic, subscriptionEndpoint(topicName), 100, 10, 1, 1, 100, false);
 
 
-        stubFor(post(urlEqualTo("/" + topicName ))
+        stubFor(post(topicUrl(topicName))
                 .inScenario(topicName)
                 .whenScenarioStateIs(Scenario.STARTED)
                 .willReturn(aResponse().withStatus(400))
                 .willSetStateTo("healthy"));
 
-        stubFor(post(urlEqualTo("/" + topicName))
+        stubFor(post(topicUrl(topicName))
                 .inScenario(topicName)
                 .whenScenarioStateIs("healthy")
                 .willReturn(aResponse().withStatus(200)));
 
         //when
-        stream(SMALL_BATCH).forEach(m -> publish(topic, m));
-
-        resetAllScenarios();
+        publish(topic, TestMessage.simple());
 
         //then
-        UrlMatchingStrategy urlMatchingStrategy = new UrlMatchingStrategy();
-        urlMatchingStrategy.setUrl("/" + topicName);
-        RequestPatternBuilder requestPattern = new RequestPatternBuilder(RequestMethod.POST, urlMatchingStrategy);
-        Awaitility.await().until(() -> {
-            List<LoggedRequest> found = findAll(requestPattern);
-            assertThat(found).hasSize(1);
-        });
+        wait.until(() -> assertThat(recordedRequests(topicName)).hasSize(1));
+    }
+
+    private List<LoggedRequest> recordedRequests(String topicName) {
+        return findAll(postRequestedFor(urlMatching("/" + topicName)));
     }
 
     private void publish(Topic topic, TestMessage m) {
         assertThat(publisher.publish(topic.getQualifiedName(), m.body())).hasStatus(CREATED);
     }
+
+    private void createSingleMessageBatchSubscription(Topic topic) {
+        operations.createBatchSubscription(topic, subscriptionEndpoint(topic.getName().getName()), 100, 10, 1, 1, 100, false);
+    }
+
+    private void createSingleMessageBatchSubscription(Topic topic, int messageTtl, int messageBackoff) {
+        operations.createBatchSubscription(topic, subscriptionEndpoint(topic.getName().getName()), messageTtl, messageBackoff, 1, 1, 100, false);
+    }
+
+    private void createSingleMessageBatchSubscription(Topic topic, boolean retryOnClientErrors) {
+        operations.createBatchSubscription(topic, subscriptionEndpoint(topic.getName().getName()), 100, 10, 1, 1, 100, retryOnClientErrors);
+    }
+
+    private String subscriptionEndpoint(String topicName) {
+        return "http://localhost:" + wireMockRule.port() + "/" + topicName;
+    }
+
 }
