@@ -5,8 +5,6 @@ import com.github.tomakehurst.wiremock.client.UrlMatchingStrategy;
 import com.github.tomakehurst.wiremock.client.WireMock;
 import com.github.tomakehurst.wiremock.stubbing.Scenario;
 import com.github.tomakehurst.wiremock.verification.LoggedRequest;
-import com.jayway.awaitility.Awaitility;
-import com.jayway.awaitility.Duration;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.BeforeMethod;
@@ -16,7 +14,6 @@ import pl.allegro.tech.hermes.test.helper.message.TestMessage;
 import pl.allegro.tech.hermes.test.helper.util.Ports;
 
 import java.util.List;
-import java.util.stream.IntStream;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
 import static com.github.tomakehurst.wiremock.client.WireMock.containing;
@@ -26,13 +23,23 @@ import static com.github.tomakehurst.wiremock.client.WireMock.postRequestedFor;
 import static com.github.tomakehurst.wiremock.client.WireMock.resetAllScenarios;
 import static com.github.tomakehurst.wiremock.client.WireMock.stubFor;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlEqualTo;
-import static com.github.tomakehurst.wiremock.client.WireMock.urlMatching;
+import static java.util.Comparator.comparingLong;
 import static javax.ws.rs.core.Response.Status.CREATED;
+import static org.apache.http.HttpStatus.SC_BAD_REQUEST;
+import static org.apache.http.HttpStatus.SC_CREATED;
+import static org.apache.http.HttpStatus.SC_INTERNAL_SERVER_ERROR;
 import static pl.allegro.tech.hermes.integration.test.HermesAssertions.assertThat;
 
 public class BatchRetryPolicyTest extends IntegrationTest {
 
+    public static final String HEALTHY = "healthy";
     private WireMockServer wireMockRule;
+
+    String failedRequestBody = "failed";
+    String successfulRequestBody = "successful";
+
+    String failedRequestBatchBody = "[failed]";
+    String successfulRequestBatchBody = "[successful]";
 
     @BeforeMethod
     public void beforeMethod() {
@@ -54,138 +61,136 @@ public class BatchRetryPolicyTest extends IntegrationTest {
     @Test
     public void shouldRetryUntilRequestSuccessful() throws Throwable {
         //given
-        String topicName = "retryUntilRequestSuccessful";
-        Topic topic = operations.buildTopic(topicName, "topic");
+        Topic topic = operations.buildTopic("group", "retryUntilRequestSuccessful");
         createSingleMessageBatchSubscription(topic);
 
-        stubFor(post(topicUrl(topicName))
-                .inScenario(topicName)
+        stubFor(post(topicUrl(topic))
+                .inScenario(topic.getQualifiedName())
                 .whenScenarioStateIs(Scenario.STARTED)
-                .willReturn(aResponse().withStatus(500))
-                .willSetStateTo("healthy"));
+                .willReturn(aResponse().withStatus(SC_INTERNAL_SERVER_ERROR))
+                .willSetStateTo(HEALTHY));
 
-        stubFor(post(topicUrl(topicName))
-                .inScenario(topicName)
-                .whenScenarioStateIs("healthy")
-                .willReturn(aResponse().withStatus(200)));
+        stubFor(post(topicUrl(topic))
+                .inScenario(topic.getQualifiedName())
+                .whenScenarioStateIs(HEALTHY)
+                .willReturn(aResponse().withStatus(SC_CREATED)));
 
         //when
         publish(topic, TestMessage.simple());
 
         //then
-        wait.until(() -> assertThat(recordedRequests(topicName)).hasSize(2));
+        wait.until(() -> assertThat(recordedRequests(topic)).hasSize(2));
+    }
 
+    @Test
+    public void shouldNotRetryIfRequestSuccessful() throws Throwable {
+        //given
+        Topic topic = operations.buildTopic("group", "notRetryIfRequestSuccessful");
+        createSingleMessageBatchSubscription(topic);
+
+        stubFor(post(topicUrl(topic)).willReturn(aResponse().withStatus(SC_CREATED)));
+
+        //when
+        publish(topic, TestMessage.simple());
+
+        //then
+        wait.until(() -> assertThat(recordedRequests(topic)).hasSize(1));
+    }
+
+    @Test
+    public void shouldRetryUntilTtlExceeded() throws Throwable {
+        //given
+        Topic topic = operations.buildTopic("group", "retryUntilTtlExceeded");
+        createSingleMessageBatchSubscription(topic, 100, 20);
+
+        stubFor(post(topicUrl(topic))
+                .withRequestBody(containing(failedRequestBody))
+                .willReturn(aResponse().withStatus(SC_INTERNAL_SERVER_ERROR)));
+
+        stubFor(post(topicUrl(topic))
+                .withRequestBody(containing(successfulRequestBody))
+                .willReturn(aResponse().withStatus(SC_CREATED)));
+
+        //when
+        publishRequestThatIsExpectedToFail(topic);
+        publishRequestThatIsExpectedToSucceed(topic);
+
+        //then
+        wait.until(() -> assertThat(recordedRequests(topic))
+                .extracting(LoggedRequest::getBodyAsString)
+                .containsSequence(failedRequestBatchBody, failedRequestBatchBody, successfulRequestBatchBody));
+    }
+
+    private void publishRequestThatIsExpectedToSucceed(Topic topic) {
+        assertThat(publisher.publish(topic.getQualifiedName(), successfulRequestBody)).hasStatus(CREATED);
+    }
+
+    @Test
+    public void shouldRetryOnClientErrors() throws Throwable {
+        //given
+        Topic topic = operations.buildTopic("group", "retryOnClientErrors");
+        createSingleMessageBatchSubscription(topic, true);
+
+        stubFor(post(topicUrl(topic))
+                .inScenario(topic.getQualifiedName())
+                .whenScenarioStateIs(Scenario.STARTED)
+                .willReturn(aResponse().withStatus(SC_BAD_REQUEST))
+                .willSetStateTo(HEALTHY));
+
+        stubFor(post(topicUrl(topic))
+                .inScenario(topic.getQualifiedName())
+                .whenScenarioStateIs(HEALTHY)
+                .willReturn(aResponse().withStatus(SC_CREATED)));
+
+        //when
+        publish(topic, TestMessage.simple());
+
+        //then
+        wait.until(() -> assertThat(recordedRequests(topic)).hasSize(2));
+    }
+
+    @Test
+    public void shouldNotRetryOnClientErrors() throws Throwable {
+        //given
+        Topic topic = operations.buildTopic("group", "notRetryOnClientErrors");
+        createSingleMessageBatchSubscription(topic, false);
+
+        stubFor(post(topicUrl(topic))
+                .withRequestBody(containing(failedRequestBody))
+                .willReturn(aResponse().withStatus(SC_BAD_REQUEST)));
+
+        stubFor(post(topicUrl(topic))
+                .withRequestBody(containing(successfulRequestBody))
+                .willReturn(aResponse().withStatus(SC_CREATED)));
+
+        //when
+        publishRequestThatIsExpectedToFail(topic);
+        publishRequestThatIsExpectedToSucceed(topic);
+
+        //then
+        wait.until(() ->
+                assertThat(recordedRequests(topic))
+                        .extracting(LoggedRequest::getBodyAsString)
+                        .containsExactly(failedRequestBatchBody, successfulRequestBatchBody));
+    }
+
+    private void publishRequestThatIsExpectedToFail(Topic topic) {
+        assertThat(publisher.publish(topic.getQualifiedName(), failedRequestBody)).hasStatus(CREATED);
+        wait.until(() -> assertThat(recordedRequests(topic).size()).isPositive());
+    }
+
+    private UrlMatchingStrategy topicUrl(Topic topic) {
+        return topicUrl(topic.getName().getName());
     }
 
     private UrlMatchingStrategy topicUrl(String topicName) {
         return urlEqualTo("/" + topicName);
     }
 
-    @Test
-    public void shouldNotRetryIfRequestSuccessful() throws Throwable {
-        //given
-        String topicName = "notRetryIfRequestSuccessful";
-        Topic topic = operations.buildTopic(topicName, "topic");
-        createSingleMessageBatchSubscription(topic);
-
-        stubFor(post(topicUrl(topicName)).willReturn(aResponse().withStatus(200)));
-
-        //when
-        publish(topic, TestMessage.simple());
-
-        //then
-        wait.until(() -> assertThat(recordedRequests(topicName)).hasSize(1));
-    }
-
-    @Test
-    public void shouldRetryUntilTtlExceeded() throws Throwable {
-        //given
-        String topicName = "retryUntilTtlExciteed";
-        Topic topic = operations.buildTopic(topicName, "topic");
-        createSingleMessageBatchSubscription(topic, 110, 20);
-
-        String failedRequestBody = "failed";
-        String successfulRequestBody = "successful";
-
-        stubFor(post(topicUrl(topicName))
-                .withRequestBody(containing(failedRequestBody))
-                .willReturn(aResponse().withStatus(500)));
-
-        stubFor(post(topicUrl(topicName))
-                .withRequestBody(containing(successfulRequestBody))
-                .willReturn(aResponse().withStatus(200)));
-
-        //when
-        assertThat(publisher.publish(topic.getQualifiedName(), failedRequestBody)).hasStatus(CREATED);
-        Thread.sleep(500);
-        assertThat(publisher.publish(topic.getQualifiedName(), successfulRequestBody)).hasStatus(CREATED);
-
-        //then
-        wait.until(() -> {
-            List<LoggedRequest> requests = recordedRequests(topicName);
-
-            assertThat(requests.size()).isEqualTo(6);
-            IntStream.range(0, 4).forEach(i -> assertThat(requests.get(i).getBodyAsString()).contains(failedRequestBody));
-            assertThat(requests.get(5).getBodyAsString()).contains(successfulRequestBody);
-        });
-    }
-
-    @Test
-    public void shouldRetryOnClientErrors() throws Throwable {
-        //given
-        String topicName = "retryOnClientErrors";
-        boolean retryOnClientErrors = true;
-        Topic topic = operations.buildTopic(topicName, "topic");
-        createSingleMessageBatchSubscription(topic, retryOnClientErrors);
-
-        stubFor(post(topicUrl(topicName))
-                .inScenario(topicName)
-                .whenScenarioStateIs(Scenario.STARTED)
-                .willReturn(aResponse().withStatus(400))
-                .willSetStateTo("healthy"));
-
-        stubFor(post(topicUrl(topicName))
-                .inScenario(topicName)
-                .whenScenarioStateIs("healthy")
-                .willReturn(aResponse().withStatus(200)));
-
-        //when
-        publish(topic, TestMessage.simple());
-
-        //then
-        wait.until(() -> assertThat(recordedRequests(topicName)).hasSize(2));
-    }
-
-
-
-    @Test
-    public void shouldNotRetryOnClientErrors() throws Throwable {
-        //given
-        String topicName = "retryOnClientErrors";
-        Topic topic = operations.buildTopic(topicName, "topic");
-        operations.createBatchSubscription(topic, subscriptionEndpoint(topicName), 100, 10, 1, 1, 100, false);
-
-
-        stubFor(post(topicUrl(topicName))
-                .inScenario(topicName)
-                .whenScenarioStateIs(Scenario.STARTED)
-                .willReturn(aResponse().withStatus(400))
-                .willSetStateTo("healthy"));
-
-        stubFor(post(topicUrl(topicName))
-                .inScenario(topicName)
-                .whenScenarioStateIs("healthy")
-                .willReturn(aResponse().withStatus(200)));
-
-        //when
-        publish(topic, TestMessage.simple());
-
-        //then
-        wait.until(() -> assertThat(recordedRequests(topicName)).hasSize(1));
-    }
-
-    private List<LoggedRequest> recordedRequests(String topicName) {
-        return findAll(postRequestedFor(urlMatching("/" + topicName)));
+    private List<LoggedRequest> recordedRequests(Topic topic) {
+        List<LoggedRequest> requests = findAll(postRequestedFor(topicUrl(topic)));
+        requests.sort(comparingLong(req -> req.getLoggedDate().getTime()));
+        return requests;
     }
 
     private void publish(Topic topic, TestMessage m) {
@@ -193,7 +198,7 @@ public class BatchRetryPolicyTest extends IntegrationTest {
     }
 
     private void createSingleMessageBatchSubscription(Topic topic) {
-        operations.createBatchSubscription(topic, subscriptionEndpoint(topic.getName().getName()), 100, 10, 1, 1, 100, false);
+        createSingleMessageBatchSubscription(topic, false);
     }
 
     private void createSingleMessageBatchSubscription(Topic topic, int messageTtl, int messageBackoff) {
