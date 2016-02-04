@@ -24,7 +24,7 @@ public class JsonMessageBatch implements MessageBatch {
 
     private final String id;
     private final ByteBuffer byteBuffer;
-    private final List<MessageMetadata> messageMetadatas = new ArrayList<>();
+    private final List<MessageMetadata> metadata = new ArrayList<>();
 
     private int elements = 0;
     private long batchStart;
@@ -57,7 +57,7 @@ public class JsonMessageBatch implements MessageBatch {
         if (elements == 0) batchStart = clock.millis();
 
         byteBuffer.put((byte) (elements == 0 ? '[' : ',')).put(data);
-        messageMetadatas.add(MessageMetadata);
+        metadata.add(MessageMetadata);
         elements++;
     }
 
@@ -101,19 +101,19 @@ public class JsonMessageBatch implements MessageBatch {
 
     @Override
     public List<PartitionOffset> getPartitionOffsets() {
-        return messageMetadatas.stream()
+        return metadata.stream()
                 .map(m -> new PartitionOffset(KafkaTopicName.valueOf(m.getTopic()), m.getOffset(), m.getPartition()))
                 .collect(Collectors.toList());
     }
 
     @Override
     public List<MessageMetadata> getMessagesMetadata() {
-        return Collections.unmodifiableList(messageMetadatas);
+        return Collections.unmodifiableList(metadata);
     }
 
     @Override
     public int size() {
-        return batchSize;
+        return elements;
     }
 
     @Override
