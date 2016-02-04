@@ -42,9 +42,9 @@ public class MessageBatchReceiver {
     }
 
     public MessageBatch next(Subscription subscription) {
-        logger.info("Trying to allocate memory for new batch for subscription {}", subscription.getId());
+        logger.debug("Trying to allocate memory for new batch for subscription {}", subscription.getId());
         MessageBatch batch = batchFactory.createBatch(subscription);
-        logger.info("New batch allocated for subscription {}", subscription.getId());
+        logger.debug("New batch allocated for subscription {}", subscription.getId());
         while (isReceiving() && !batch.isReadyForDelivery()) {
             try {
                 Message message = inflight.isEmpty() ? receive(subscription, batch.getId()) : inflight.poll();
@@ -60,7 +60,7 @@ public class MessageBatchReceiver {
                 // ignore
             }
         }
-        logger.info("Batch is ready for delivery for subscription {}", subscription.getId());
+        logger.debug("Batch is ready for delivery for subscription {}", subscription.getId());
         return batch.close();
     }
 

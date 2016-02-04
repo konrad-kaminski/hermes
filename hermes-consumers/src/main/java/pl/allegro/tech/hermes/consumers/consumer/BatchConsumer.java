@@ -69,16 +69,16 @@ public class BatchConsumer implements Consumer {
         while (isConsuming()) {
             Optional<MessageBatch> inflight = Optional.empty();
             try {
-                logger.info("Trying to create new batch for subscription {}", subscription.getId());
+                logger.debug("Trying to create new batch for subscription {}", subscription.getId());
                 inflight = of(receiver.next(subscription));
                 inflight.ifPresent(batch -> {
-                    logger.info("Delivering batch for subscription {}", subscription.getId());
+                    logger.debug("Delivering batch for subscription {}", subscription.getId());
                     deliver(batch, createRetryer(batch, subscription.getSubscriptionPolicy()));
-                    logger.info("Finished delivering batch for subscription {}", subscription.getId());
+                    logger.debug("Finished delivering batch for subscription {}", subscription.getId());
                     offsets.putAllDelivered(batch.getPartitionOffsets());
                 });
             } finally {
-                logger.info("Cleaning batch for subscription {}", subscription.getId());
+                logger.debug("Cleaning batch for subscription {}", subscription.getId());
                 inflight.ifPresent(this::clean);
             }
         }
