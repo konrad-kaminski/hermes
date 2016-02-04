@@ -170,7 +170,11 @@ public class SubscriptionPolicy {
         }
 
         public Builder withClientErrorRetry() {
-            subscriptionPolicy.retryClientErrors = true;
+            return withClientErrorRetry(true);
+        }
+
+        public Builder withClientErrorRetry(boolean retry) {
+            subscriptionPolicy.retryClientErrors = retry;
             return this;
         }
 

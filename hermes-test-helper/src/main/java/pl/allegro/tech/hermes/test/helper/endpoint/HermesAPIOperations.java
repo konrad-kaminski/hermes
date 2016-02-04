@@ -136,16 +136,20 @@ public class HermesAPIOperations {
     }
 
     public void createBatchSubscription(Topic topic, String endpoint, int messageTtl, int batchSize, int batchTime, int batchVolume) {
+        createBatchSubscription(topic, endpoint, messageTtl, 10, batchSize, batchTime, batchVolume, false);
+    }
+
+    public void createBatchSubscription(Topic topic, String endpoint, int messageTtl, int messageBackoff, int batchSize, int batchTime, int batchVolume, boolean retryOnClientErrors) {
         SubscriptionPolicy policy = SubscriptionPolicy.Builder.subscriptionPolicy()
                 .withRate(1)
                 .withMessageTtl(messageTtl)
-                .withMessageBackoff(10)
+                .withMessageBackoff(messageBackoff)
                 .withDeliveryType(DeliveryType.BATCH)
                 .withBatchSize(batchSize)
                 .withBatchTime(batchTime)
                 .withBatchVolume(batchVolume)
+                .withClientErrorRetry(retryOnClientErrors)
                 .build();
-
 
         Subscription subscription = subscription()
                 .applyDefaults()
