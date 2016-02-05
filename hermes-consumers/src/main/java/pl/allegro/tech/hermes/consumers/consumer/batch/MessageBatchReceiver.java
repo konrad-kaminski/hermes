@@ -11,11 +11,13 @@ import pl.allegro.tech.hermes.consumers.consumer.receiver.MessageReceivingTimeou
 import pl.allegro.tech.hermes.tracker.consumers.MessageMetadata;
 import pl.allegro.tech.hermes.tracker.consumers.Trackers;
 
+import javax.annotation.concurrent.NotThreadSafe;
 import java.util.ArrayDeque;
 import java.util.Queue;
 
 import static com.google.common.base.Preconditions.checkArgument;
 
+@NotThreadSafe
 public class MessageBatchReceiver {
     private static final Logger logger = LoggerFactory.getLogger(MessageBatchReceiver.class);
 
@@ -71,7 +73,9 @@ public class MessageBatchReceiver {
     }
 
     private MessageMetadata messageMetadata(Subscription subscription, String batchId, Message next) {
-        return new MessageMetadata(next.getId(), batchId, next.getOffset(), next.getPartition(), subscription.getQualifiedTopicName(), subscription.getName(), next.getPublishingTimestamp(), next.getReadingTimestamp());
+        return new MessageMetadata(next.getId(), batchId, next.getOffset(), next.getPartition(),
+                subscription.getQualifiedTopicName(), subscription.getName(),
+                next.getPublishingTimestamp(), next.getReadingTimestamp());
     }
 
     private boolean isReceiving() {

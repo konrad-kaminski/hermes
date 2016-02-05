@@ -11,11 +11,11 @@ import static pl.allegro.tech.hermes.common.metric.Meters.METER;
 import static pl.allegro.tech.hermes.common.metric.Meters.SUBSCRIPTION_METER;
 import static pl.allegro.tech.hermes.common.metric.Meters.TOPIC_METER;
 
-public class BatchEcosystem {
+public class BatchMonitoring {
     private HermesMetrics metrics;
     private Trackers trackers;
 
-    public BatchEcosystem(HermesMetrics metrics, Trackers trackers) {
+    public BatchMonitoring(HermesMetrics metrics, Trackers trackers) {
         this.metrics = metrics;
         this.trackers = trackers;
     }
@@ -61,10 +61,8 @@ public class BatchEcosystem {
     private void registerFailureMetrics(Subscription subscription, MessageSendingResult result) {
         if (result.hasHttpAnswer()) {
             metrics.registerConsumerHttpAnswer(subscription, result.getStatusCode());
-        } else if (result.isTimeout()) {
-            metrics.consumerErrorsTimeoutMeter(subscription).mark();
         } else {
-            metrics.consumerErrorsOtherMeter(subscription).mark();
+            (result.isTimeout() ? metrics.consumerErrorsTimeoutMeter(subscription) : metrics.consumerErrorsOtherMeter(subscription)).mark();
         }
     }
 }

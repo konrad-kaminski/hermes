@@ -6,6 +6,7 @@ import pl.allegro.tech.hermes.common.kafka.KafkaTopicName;
 import pl.allegro.tech.hermes.common.kafka.offset.PartitionOffset;
 import pl.allegro.tech.hermes.tracker.consumers.MessageMetadata;
 
+import javax.annotation.concurrent.NotThreadSafe;
 import java.nio.BufferOverflowException;
 import java.nio.ByteBuffer;
 import java.time.Clock;
@@ -16,6 +17,7 @@ import java.util.stream.Collectors;
 
 import static com.google.common.base.Preconditions.checkState;
 
+@NotThreadSafe
 public class JsonMessageBatch implements MessageBatch {
     private final Clock clock;
 
@@ -54,9 +56,9 @@ public class JsonMessageBatch implements MessageBatch {
     public void append(byte[] data, MessageMetadata MessageMetadata) {
         checkState(!closed, "Batch already closed.");
         if (!canFit(data)) throw new BufferOverflowException();
-        if (elements == 0) batchStart = clock.millis();
+        if (isEmpty()) batchStart = clock.millis();
 
-        byteBuffer.put((byte) (elements == 0 ? '[' : ',')).put(data);
+        byteBuffer.put((byte) (isEmpty() ? '[' : ',')).put(data);
         metadata.add(MessageMetadata);
         elements++;
     }
@@ -67,8 +69,8 @@ public class JsonMessageBatch implements MessageBatch {
     }
 
     @Override
-    public boolean isReadyForDelivery() {
-        return closed || isFull() || (batchStart != 0 && getLifetime() > maxBatchTime);
+    public boolean isExpired() {
+        return !isEmpty() && getLifetime() > maxBatchTime;
     }
 
     @Override
@@ -83,7 +85,7 @@ public class JsonMessageBatch implements MessageBatch {
 
     @Override
     public MessageBatch close() {
-        byteBuffer.put("]".getBytes());
+        if (!isEmpty()) byteBuffer.put((byte)']');
         int position = byteBuffer.position();
         byteBuffer.position(0);
         byteBuffer.limit(position);
@@ -93,9 +95,7 @@ public class JsonMessageBatch implements MessageBatch {
 
     @Override
     public ByteBuffer getContent() {
-        if (closed) {
-            byteBuffer.position(0);
-        }
+        if (closed) byteBuffer.position(0);
         return byteBuffer;
     }
 
@@ -119,5 +119,15 @@ public class JsonMessageBatch implements MessageBatch {
     @Override
     public long getLifetime() {
         return clock.millis() - batchStart;
+    }
+
+    @Override
+    public boolean isClosed() {
+        return closed;
+    }
+
+    @Override
+    public boolean isEmpty() {
+        return elements == 0;
     }
 }

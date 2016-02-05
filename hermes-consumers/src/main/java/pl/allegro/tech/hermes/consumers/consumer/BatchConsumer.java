@@ -11,7 +11,7 @@ import pl.allegro.tech.hermes.api.Subscription;
 import pl.allegro.tech.hermes.api.SubscriptionPolicy;
 import pl.allegro.tech.hermes.common.kafka.offset.PartitionOffset;
 import pl.allegro.tech.hermes.common.metric.HermesMetrics;
-import pl.allegro.tech.hermes.consumers.consumer.batch.BatchEcosystem;
+import pl.allegro.tech.hermes.consumers.consumer.batch.BatchMonitoring;
 import pl.allegro.tech.hermes.consumers.consumer.batch.MessageBatch;
 import pl.allegro.tech.hermes.consumers.consumer.batch.MessageBatchFactory;
 import pl.allegro.tech.hermes.consumers.consumer.batch.MessageBatchReceiver;
@@ -44,7 +44,7 @@ public class BatchConsumer implements Consumer {
     private Subscription subscription;
     boolean consuming = true;
 
-    private BatchEcosystem ecosystem;
+    private BatchMonitoring ecosystem;
 
     public BatchConsumer(MessageReceiver receiver,
                          MessageBatchSender sender,
@@ -60,7 +60,7 @@ public class BatchConsumer implements Consumer {
         this.offsets = offsets;
         this.subscription = subscription;
         this.hermesMetrics = hermesMetrics;
-        this.ecosystem = new BatchEcosystem(hermesMetrics, trackers);
+        this.ecosystem = new BatchMonitoring(hermesMetrics, trackers);
     }
 
     @Override

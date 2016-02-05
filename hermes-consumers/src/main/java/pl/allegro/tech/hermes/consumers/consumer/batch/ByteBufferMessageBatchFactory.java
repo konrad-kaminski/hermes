@@ -1,15 +1,16 @@
 package pl.allegro.tech.hermes.consumers.consumer.batch;
 
 import pl.allegro.tech.hermes.api.Subscription;
+import pl.allegro.tech.hermes.common.exception.InternalProcessingException;
 import pl.allegro.tech.hermes.common.metric.Gauges;
 import pl.allegro.tech.hermes.common.metric.HermesMetrics;
 
 import java.nio.ByteBuffer;
 import java.time.Clock;
-import java.util.UUID;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 import static java.lang.String.format;
+import static java.util.UUID.randomUUID;
 
 public class ByteBufferMessageBatchFactory implements MessageBatchFactory {
     private final DirectBufferPool bufferPool;
@@ -25,19 +26,16 @@ public class ByteBufferMessageBatchFactory implements MessageBatchFactory {
     @Override
     public MessageBatch createBatch(Subscription subscription) {
         try {
-            final String id = UUID.randomUUID().toString();
-            int capacity = subscription.getSubscriptionPolicy().getBatchVolume();
-            ByteBuffer buffer = bufferPool.allocate(capacity);
-            buffer.limit(capacity);
+            ByteBuffer buffer = bufferPool.allocate(subscription.getSubscriptionPolicy().getBatchVolume());
             switch (subscription.getContentType()) {
                 case JSON:
-                    return new JsonMessageBatch(id, buffer, subscription, clock);
+                    return new JsonMessageBatch(randomUUID().toString(), buffer, subscription, clock);
                 case AVRO:
                 default:
                     throw new UnsupportedOperationException(format("Batching is not supported yet for contentType=%s", subscription.getContentType()));
             }
         } catch (InterruptedException e) {
-            throw new RuntimeException(e);
+            throw new InternalProcessingException(e);
         }
     }
 

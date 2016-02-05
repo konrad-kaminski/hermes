@@ -9,27 +9,33 @@ import java.nio.ByteBuffer;
 import java.util.List;
 
 public interface MessageBatch {
-    boolean isFull();
-
     void append(byte[] data, MessageMetadata batchMessageMetadata) throws BufferOverflowException;
 
     boolean canFit(byte[] data);
 
-    boolean isReadyForDelivery();
+    default boolean isReadyForDelivery() {
+        return isClosed() || isFull() || isExpired();
+    }
+
+    boolean isExpired();
+    boolean isClosed();
+    boolean isFull();
 
     String getId();
 
     ContentType getContentType();
 
-    MessageBatch close();
-
     ByteBuffer getContent();
 
     List<PartitionOffset> getPartitionOffsets();
 
-    int size();
-
     List<MessageMetadata> getMessagesMetadata();
 
     long getLifetime();
+
+    int size();
+
+    MessageBatch close();
+
+    boolean isEmpty();
 }
