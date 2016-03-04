@@ -2,38 +2,30 @@ package pl.allegro.tech.hermes.frontend.publishing;
 
 import org.apache.avro.Schema;
 import org.junit.Test;
-import pl.allegro.tech.hermes.api.ContentType;
-import pl.allegro.tech.hermes.api.Topic;
-import pl.allegro.tech.hermes.domain.topic.schema.SchemaRepository;
+import pl.allegro.tech.hermes.domain.topic.schema.SchemaVersion;
+import pl.allegro.tech.hermes.domain.topic.schema.CompiledSchema;
+import pl.allegro.tech.hermes.frontend.publishing.avro.AvroMessage;
 import pl.allegro.tech.hermes.frontend.publishing.message.Message;
 import pl.allegro.tech.hermes.test.helper.avro.AvroUser;
 
 import java.io.IOException;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
-import static pl.allegro.tech.hermes.test.helper.builder.TopicBuilder.topic;
 
 public class MessageContentTypeEnforcerTest {
 
-    @SuppressWarnings("unchecked")
-    private SchemaRepository<Schema> schemaRepository = mock(SchemaRepository.class);
-
-    private MessageContentTypeEnforcer enforcer = new MessageContentTypeEnforcer(schemaRepository);
+    private MessageContentTypeEnforcer enforcer = new MessageContentTypeEnforcer();
 
     private AvroUser avroMessage = new AvroUser("Bob", 30, "black");
+    private CompiledSchema<Schema> schema = new CompiledSchema<>(avroMessage.getSchema(), SchemaVersion.valueOf(0));
 
     @Test
     public void shouldConvertToAvroWhenReceivedJSONOnAvroTopic() throws IOException {
         // given
-        Topic topic = topic("enforcer", "json2avro").withContentType(ContentType.AVRO).build();
-        Message message = new Message("1", avroMessage.asJson().getBytes(), 1234);
-
-        when(schemaRepository.getSchema(topic)).thenReturn(avroMessage.getSchema());
+        AvroMessage message = new AvroMessage("1", avroMessage.asJson().getBytes(), 1234, schema);
 
         // when
-        Message enforcedMessage = enforcer.enforce("application/json", message, topic);
+        Message enforcedMessage = enforcer.enforceAvro("application/json", message);
 
         // then
         assertThat(enforcedMessage.getData()).isEqualTo(avroMessage.asBytes());
@@ -42,39 +34,22 @@ public class MessageContentTypeEnforcerTest {
     @Test
     public void shouldStringContentTypeOfAdditionalOptionsWhenInterpretingIt() throws IOException {
         // given
-        Topic topic = topic("enforcer", "json2avro-encoding").withContentType(ContentType.AVRO).build();
-        Message message = new Message("1", avroMessage.asJson().getBytes(), 1234);
-
-        when(schemaRepository.getSchema(topic)).thenReturn(avroMessage.getSchema());
+        AvroMessage message = new AvroMessage("1", avroMessage.asJson().getBytes(), 1234, schema);
 
         // when
-        Message enforcedMessage = enforcer.enforce("application/json;encoding=utf-8", message, topic);
+        Message enforcedMessage = enforcer.enforceAvro("application/json;encoding=utf-8", message);
 
         // then
         assertThat(enforcedMessage.getData()).isEqualTo(avroMessage.asBytes());
     }
 
     @Test
-    public void shouldNotConvertWhenReceivingJSONOnJSONTopic() throws IOException {
-        // given
-        Topic topic = topic("enforcer", "json2json").withContentType(ContentType.JSON).build();
-        Message message = new Message("1", avroMessage.asJson().getBytes(), 1234);
-
-        // when
-        Message enforcedMessage = enforcer.enforce("application/json", message, topic);
-
-        // then
-        assertThat(enforcedMessage.getData()).isEqualTo(avroMessage.asJson().getBytes());
-    }
-
-    @Test
     public void shouldNotConvertWhenReceivingAvroOnAvroTopic() throws IOException {
         // given
-        Topic topic = topic("enforcer", "avro2avro").withContentType(ContentType.AVRO).build();
-        Message message = new Message("1", avroMessage.asBytes(), 1234);
+        AvroMessage message = new AvroMessage("1", avroMessage.asBytes(), 1234, schema);
 
         // when
-        Message enforcedMessage = enforcer.enforce("avro/binary", message, topic);
+        Message enforcedMessage = enforcer.enforceAvro("avro/binary", message);
 
         // then
         assertThat(enforcedMessage.getData()).isEqualTo(avroMessage.asBytes());

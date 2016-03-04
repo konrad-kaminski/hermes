@@ -58,7 +58,7 @@ public class HermesAPIOperations {
         wait.untilTopicCreated(topic);
 
         ofNullable(topic.getMessageSchema()).ifPresent(s ->
-                assertThat(endpoints.schema().save(topic.getQualifiedName(), s).getStatus()).isEqualTo(CREATED.getStatusCode()));
+                assertThat(endpoints.schema().save(topic.getQualifiedName(), false, s).getStatus()).isEqualTo(CREATED.getStatusCode()));
 
         return topic;
     }
@@ -124,7 +124,18 @@ public class HermesAPIOperations {
         Topic beforeUpdate = endpoints.topic().get(topicName.qualifiedName());
         Topic reference = Patch.apply(beforeUpdate, patch);
 
-        assertThat(endpoints.topic().update(topicName.qualifiedName(), patch).getStatus()).isEqualTo(OK.getStatusCode());
+        ofNullable(reference.getMessageSchema()).ifPresent(s ->
+                assertThat(endpoints.schema().save(reference.getQualifiedName(), false, s).getStatus()).isEqualTo(CREATED.getStatusCode()));
+
+        Response r = endpoints.topic().update(topicName.qualifiedName(), patch);
+
+        System.out.println("---------------------");
+        System.out.println(r.readEntity(String.class));
+        System.out.println("---------------------");
+
+        assertThat(r.getStatus()).isEqualTo(OK.getStatusCode());
+
+
 
         wait.untilTopicUpdated(reference);
     }

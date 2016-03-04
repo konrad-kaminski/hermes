@@ -6,6 +6,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import pl.allegro.tech.hermes.common.exception.InvalidSchemaException;
 import pl.allegro.tech.hermes.common.exception.SchemaRepoException;
+import pl.allegro.tech.hermes.domain.topic.schema.SchemaVersion;
 
 import javax.ws.rs.client.Client;
 import javax.ws.rs.client.Entity;
@@ -82,15 +83,20 @@ public class JerseySchemaRepoClient implements SchemaRepoClient {
     }
 
     @Override
-    public Optional<String> getSchema(String subject, int version) {
-        throw new UnsupportedOperationException("sry");
+    public Optional<String> getSchema(String subject, SchemaVersion version) {
+        Response response = target.path(subject).path("id").path(Integer.toString(version.value())).request().get();
+        if (response.getStatus() == Response.Status.OK.getStatusCode()) {
+            String schema = parseSchema(response.readEntity(String.class));
+            return Optional.of(schema);
+        }
+        return Optional.empty();
     }
 
-    public List<Integer> getSchemaVersions(String subject) {
+    public List<SchemaVersion> getSchemaVersions(String subject) {
         Response response = target.path(subject).path("all").request().accept(MediaType.APPLICATION_JSON_TYPE).get();
         if (response.getStatus() == Response.Status.OK.getStatusCode()) {
             List<SchemaWithId> schemasWithIds = Optional.ofNullable(response.readEntity(new GenericType<List<SchemaWithId>>() {})).orElseGet(Collections::emptyList);
-            return schemasWithIds.stream().map(SchemaWithId::getId).sorted(Comparator.reverseOrder()).collect(Collectors.toList());
+            return schemasWithIds.stream().map(SchemaWithId::getId).sorted(Comparator.reverseOrder()).map(SchemaVersion::valueOf).collect(Collectors.toList());
         }
         return Collections.emptyList();
     }
