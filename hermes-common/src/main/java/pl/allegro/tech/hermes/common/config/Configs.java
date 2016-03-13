@@ -153,7 +153,7 @@ public enum Configs {
     SCHEMA_CACHE_ENABLED("schema.cache.enabled", true),
     SCHEMA_CACHE_COMPILED_MAXIMUM_SIZE("schema.cache.compiled.maximum.size", 2000),
     SCHEMA_REPOSITORY_TYPE("schema.repository.type", "zookeeper"),
-    SCHEMA_REPOSITORY_SERVER_URL("schema.repository.serverUrl", "http://localhost:2876/schema-repo/"),
+    SCHEMA_REPOSITORY_SERVER_URL("schema.repository.serverUrl", "http://localhost:8888/schema-repo/"),
 
     UNDELIVERED_MESSAGE_LOG_PERSIST_PERIOD_MS("undelivered.message.log.persist.period.ms", 5000);
 
